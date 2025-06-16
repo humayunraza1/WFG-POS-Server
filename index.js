@@ -11,7 +11,7 @@ const app = express();
 app.use(cookieParser());
 // Middleware
 app.use(cors({
-  origin: process.env.FRONT_END_URL || 'http://localhost:5173', // 👈 must match your frontend origin exactly
+  origin: process.env.FRONT_END_URL, // 👈 must match your frontend origin exactly
   credentials: true,              // 👈 allow cookies / auth headers
 }));
 app.use(express.json());
