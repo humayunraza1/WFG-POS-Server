@@ -107,12 +107,12 @@ router.post('/close', async (req, res) => {
     // Calculate totals
     const totalSales = sessionOrders.reduce((sum, order) => sum + order.finalPrice, 0);
     const totalExpenses = sessionExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-
+    const expectedBalance = register.startCash + totalSales - totalExpenses;
     // Update register with final data
     register.isOpen = false;
     register.closedAt = new Date();
-    register.finalCash = finalCash;
     register.closingBalance = finalCash;
+    register.expectedBalance = expectedBalance;
     register.totalSales = totalSales;
     register.totalExpenses = totalExpenses;
     register.orders = sessionOrders.map(order => order._id);

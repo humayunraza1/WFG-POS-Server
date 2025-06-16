@@ -125,14 +125,16 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
       {
         $group: {
           _id: null,
-          totalSales: { $sum: '$amountPaid' }, // Changed from finalPrice to amountPaid
+          cashRecvd: { $sum: '$amountPaid' }, // Changed from finalPrice to amountPaid
+          totalSales: { $sum: '$finalPrice' }, // Changed from finalPrice to amountPaid
           totalPendingPayment: { $sum: '$outstandingPayment' }, // Add pending payment
           orderCount: { $sum: 1 }
         }
       }
     ]);
 
-    const dailyStats = result[0] || { 
+    const dailyStats = result[0] || {
+      cashRecvd: 0,
       totalSales: 0, 
       totalPendingPayment: 0,
       orderCount: 0 

@@ -29,14 +29,14 @@ const registerSchema = new mongoose.Schema({
     required: true,
     default: 0
   },
-  finalCash: {
-    type: Number
-  },
   openingBalance: {
     type: Number,
     default: 0
   },
   closingBalance: {
+    type: Number
+  },
+  expectedBalance: {
     type: Number
   },
   totalSales: {
