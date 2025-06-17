@@ -83,6 +83,7 @@ router.post('/', async (req, res) => {
   
   const order = new Order({
     registerSession: req.body.registerSession,
+    actualPrice: req.body.subtotal, // Calculate actual price
     items: req.body.items,
     discount: req.body.discount,
     paymentType: req.body.paymentType,

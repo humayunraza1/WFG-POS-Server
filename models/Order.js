@@ -32,6 +32,11 @@ const orderSchema = new mongoose.Schema({
     enum: ['cash', 'online'],
     required: true
   },
+  actualPrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
   finalPrice: {
     type: Number,
     required: true,
