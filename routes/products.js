@@ -49,7 +49,8 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const newProductId = await getNextProductId();
-
+    console.log('New Product ID:', newProductId);
+    console.log(req.body)
     const product = new Product({
       customId: newProductId,
       name: req.body.name,
@@ -57,7 +58,6 @@ router.post('/', async (req, res) => {
     });
 
     const savedProduct = await product.save();
-
     // Save variants
     const variantDocs = await Promise.all(req.body.variants.map(async (variant, index) => {
       return await new Variant({
@@ -71,6 +71,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ product: savedProduct, variants: variantDocs });
   } catch (error) {
+    console.error('Error creating product:', error);
     res.status(400).json({ message: error.message });
   }
 });

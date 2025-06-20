@@ -118,24 +118,61 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
     const { sessionId } = req.params;
     
     const result = await Order.aggregate([
-      {
-        $match: {
-          registerSession: sessionId
+  {
+    $match: {
+      registerSession: sessionId
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      cashRecvd: {
+        $sum: {
+          $cond: [
+            { $eq: ['$paymentType', 'cash'] },
+            '$amountPaid',
+            0
+          ]
         }
       },
-      {
-        $group: {
-          _id: null,
-          cashRecvd: { $sum: '$amountPaid' }, // Changed from finalPrice to amountPaid
-          totalSales: { $sum: '$finalPrice' }, // Changed from finalPrice to amountPaid
-          totalPendingPayment: { $sum: '$outstandingPayment' }, // Add pending payment
-          orderCount: { $sum: 1 }
+      onlinePaymnt: {
+        $sum: {
+          $cond: [
+            { $eq: ['$paymentType', 'online'] },
+            '$amountPaid',
+            0
+          ]
         }
-      }
-    ]);
-
+      },
+      expectedCash: {
+        $sum: {
+          $cond: [
+            { $eq: ['$paymentType', 'cash'] },
+            '$finalPrice',
+            0
+          ]
+        }
+      },
+      expectedOnline: {
+        $sum: {
+          $cond: [
+            { $eq: ['$paymentType', 'online'] },
+            '$finalPrice',
+            0
+          ]
+        }
+      },
+      totalSales: { $sum: '$finalPrice' },
+      totalPendingPayment: { $sum: '$outstandingPayment' },
+      orderCount: { $sum: 1 }
+    }
+  }
+]);
     const dailyStats = result[0] || {
       cashRecvd: 0,
+      onlinePaymnt: 0,
+      expectedCash: 0,
+      expectedOnline: 0,
       totalSales: 0, 
       totalPendingPayment: 0,
       orderCount: 0 
