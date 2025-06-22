@@ -43,6 +43,22 @@ const registerSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+    cashRecvd:{
+    type: Number,
+    default: 0
+  },
+  onlineRecvd:{
+    type: Number,
+    default: 0
+  },
+    expectedCash:{
+    type: Number,
+    default: 0
+  },
+  expectedOnline:{
+    type: Number,
+    default: 0
+  },
   totalExpenses: {
     type: Number,
     default: 0

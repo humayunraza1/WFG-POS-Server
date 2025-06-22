@@ -83,6 +83,7 @@ router.post('/open', async (req, res) => {
 });
 
 // Close register
+// Close register
 router.post('/close', async (req, res) => {
   try {
     const register = await Register.findOne({ isOpen: true })
@@ -101,13 +102,24 @@ router.post('/close', async (req, res) => {
 
     // Get all orders and expenses for this session
     const sessionOrders = await Order.find({ registerSession: register.sessionId });
-    // FIX: Use sessionId instead of _id to find expenses
     const sessionExpenses = await Expense.find({ registerSession: register.sessionId });
 
+    // Calculate cash payment totals
+    const cashOrders = sessionOrders.filter(order => order.paymentType === 'cash');
+    const cashRecvd = cashOrders.reduce((sum, order) => sum + order.amountPaid, 0);
+    const expectedCash = cashOrders.reduce((sum, order) => sum + order.finalPrice, 0);
+    console.log(cashOrders)
+    // Calculate online payment totals
+    const onlineOrders = sessionOrders.filter(order => order.paymentType === 'online');
+    const onlineRecvd = onlineOrders.reduce((sum, order) => sum + order.amountPaid, 0);
+    const expectedOnline = onlineOrders.reduce((sum, order) => sum + order.finalPrice, 0);
+    // console.log(cashOrders)
+    
     // Calculate totals
     const totalSales = sessionOrders.reduce((sum, order) => sum + order.finalPrice, 0);
     const totalExpenses = sessionExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-    const expectedBalance = register.startCash + totalSales - totalExpenses;
+    const expectedBalance = register.startCash + expectedCash - totalExpenses;
+
     // Update register with final data
     register.isOpen = false;
     register.closedAt = new Date();
@@ -115,6 +127,10 @@ router.post('/close', async (req, res) => {
     register.expectedBalance = expectedBalance;
     register.totalSales = totalSales;
     register.totalExpenses = totalExpenses;
+    register.expectedCash = expectedCash;
+    register.expectedOnline = expectedOnline;
+    register.cashRecvd = cashRecvd;
+    register.onlineRecvd = onlineRecvd;
     register.orders = sessionOrders.map(order => order._id);
     register.expenses = sessionExpenses.map(expense => expense._id);
 
@@ -124,7 +140,6 @@ router.post('/close', async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
-
 // Get all register sessions with optional date filtering and manager filtering
 router.get('/sessions', async (req, res) => {
   try {
