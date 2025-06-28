@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 const Expense = require('../models/Expense');
-const {Register} = require('../models/Register');
+const Register = require('../models/Register');
 const Report = require('../models/Report');
 
 // Helper function to get date range

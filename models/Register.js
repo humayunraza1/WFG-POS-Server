@@ -1,19 +1,25 @@
 const mongoose = require('mongoose');
 
-// Define available managers
-const MANAGERS = ['Hamza', 'Wajeeh', 'Talal'];
-
 const registerSchema = new mongoose.Schema({
   sessionId: {
     type: String,
     required: true,
     unique: true
   },
-  manager: {
-    type: String,
-    required: true,
-    enum: MANAGERS
-  },
+      cashier: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Account', // the new cashier user
+      required: false  // allow null for legacy sessions
+    },
+    managerRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Account',
+      required: false
+    },
+    manager: {
+      type: String,
+      required: true  // for old compatibility
+    },
   isOpen: {
     type: Boolean,
     default: false
@@ -80,7 +86,4 @@ const registerSchema = new mongoose.Schema({
 });
 
 // Export the model with the MANAGERS constant for use in routes
-module.exports = {
-  Register: mongoose.model('Register', registerSchema),
-  MANAGERS
-};
+module.exports = mongoose.model('Register', registerSchema)

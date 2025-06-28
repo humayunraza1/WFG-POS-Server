@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Expense = require('../models/Expense');
-const {Register} = require('../models/Register');
+const Register = require('../models/Register');
 const authenticate = require('../middleware/authenticate');
+const updateRegister = require('../utils/updateRegister');
 
 router.use(authenticate);
 // Get all expenses
@@ -38,13 +39,12 @@ router.post('/', async (req, res) => {
 
   try {
     const newExpense = await expense.save();
-    
-    // Update register total expenses
+      // Update register total expenses
     await Register.findOneAndUpdate(
-      { isOpen: true },
-      { $inc: { totalExpenses: req.body.amount } }
-    );
-
+      { isOpen: true, cashier: cashierId },
+      { $push: { expenses: newExpense._id }}
+    );  
+  await updateRegister(req.body.registerSession);
     res.status(201).json(newExpense);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -54,6 +54,7 @@ router.post('/', async (req, res) => {
 // Update expense
 router.put('/:id', async (req, res) => {
   try {
+    const cashierId = req.user?.userId;
     const { id } = req.params;
     const { name, amount } = req.body;
     
@@ -73,10 +74,8 @@ router.put('/:id', async (req, res) => {
     );
     
     // Update register total expenses with the difference
-    await Register.findOneAndUpdate(
-      { isOpen: true },
-      { $inc: { totalExpenses: amountDifference } }
-    );
+    await updateRegister(oldExpense.registerSession);
+
 
     res.json(updatedExpense);
   } catch (error) {
@@ -94,16 +93,15 @@ router.delete('/:id', async (req, res) => {
     if (!expense) {
       return res.status(404).json({ message: 'Expense not found' });
     }
-    
+    await Register.findOneAndUpdate(
+      { isOpen: true, sessionId: expense.registerSession },
+      { $pull: { expenses: expense._id } }
+    );
     // Delete the expense
     await Expense.findByIdAndDelete(id);
     
-    // Update register total expenses by subtracting the deleted amount
-    await Register.findOneAndUpdate(
-      { isOpen: true },
-      { $inc: { totalExpenses: -expense.amount } }
-    );
-
+  await updateRegister(req.body.registerSession);
+    
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });

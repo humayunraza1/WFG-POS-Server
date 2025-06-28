@@ -1,36 +1,40 @@
 const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
+const Employees = require('../models/Employees');
 const { expandAccess } = require('../utils/accessControl');
 
 const JWT_SECRET = process.env.JWT_SECRET 
 const REFRESH_SECRET = process.env.REFRESH_SECRET
 
-const authenticate = async (req, res, next) => {
+const authenticateManager = async (req, res, next) => {
   try {
-    const { accessToken, refreshToken } = req.cookies;
+    const { managerAccessToken, managerRefreshToken } = req.cookies;
     
     // If no tokens, user is not authenticated
-    if (!accessToken && !refreshToken) {
+    if (!managerAccessToken && !managerRefreshToken) {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
     
     // Try to verify access token first
-    if (accessToken) {
+    if (managerAccessToken) {
       try {
-        const decoded = jwt.verify(accessToken, JWT_SECRET);
+        const decoded = jwt.verify(managerAccessToken, JWT_SECRET);
         const account = await Account.findById(decoded.userId).select('-password -refreshTokens');
+        const employee = await Employees.findOne({ accountRef: account._id });
+        
     if (account) {
       try{
           req.user = {
             userId: account._id,
-            username: account.username,
+            role: employee.role,
             access: expandAccess(account.access)
           };
+
+          console.log("User Access:", req.user.access);
           return next();
       } catch (error) {
         // Access token is invalid/expired, try refresh token
-        console.error('Access token verification error:', error);
-        console.log('Access token expired, trying refresh token');
+        console.log('Manager Access token expired, trying refresh token');
       }
     }
    } catch (error) {
@@ -39,44 +43,45 @@ const authenticate = async (req, res, next) => {
       } 
     }    
     // If access token is invalid/expired, try refresh token
-    if (refreshToken) {
+    if (managerRefreshToken) {
       try {
-        const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
+        const decoded = jwt.verify(managerRefreshToken, REFRESH_SECRET);
         const account = await Account.findById(decoded.userId);
+            const employee = await Employees.findOne({ accountRef: account._id });
         
         if (!account) {
           return res.status(401).json({ message: 'Account not found' });
         }
         
         // Check if refresh token exists in database
-        const tokenExists = account.refreshTokens.some(tokenObj => tokenObj.token === refreshToken);
+        const tokenExists = account.refreshTokens.some(tokenObj => tokenObj.token === managerRefreshToken);
         if (!tokenExists) {
           return res.status(401).json({ message: 'Invalid refresh token' });
         }
         
         // Generate new access token
         const newAccessToken = jwt.sign(
-          { userId: account._id }, 
+          { userId: account._id,role: employee.role, access: expandAccess(account.access) }, 
           JWT_SECRET, 
           { expiresIn: '15m' }
         );
         
         // Set new access token cookie
-        res.cookie('accessToken', newAccessToken, {
+        res.cookie('managerAccessToken', newAccessToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict',
           maxAge: 15 * 60 * 1000 // 15 minutes
         });
         
-        req.user = { userId: account._id, username: account.username };
+        req.user = { userId: account._id, role: employee.role, access: expandAccess(account.access) };
         return next();
         
       } catch (error) {
         console.error('Refresh token error:', error);
         // Clear invalid cookies
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
+        res.clearCookie('managerAccessToken');
+        res.clearCookie('managerRefreshToken');
         return res.status(401).json({ message: 'Invalid refresh token' });
       }
     }
@@ -89,4 +94,4 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-module.exports = authenticate;
+module.exports = authenticateManager;

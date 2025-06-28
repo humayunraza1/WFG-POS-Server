@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
-const {Register} = require('../models/Register');
+const Register = require('../models/Register');
 const { default: mongoose } = require('mongoose');
 const authenticate = require('../middleware/authenticate');
+const hasAccess = require('../middleware/hasAccess');
+const updateRegister = require('../utils/updateRegister');
 
 router.use(authenticate);
 // Get all orders
@@ -58,7 +60,8 @@ router.get('/session/:sessionId', async (req, res) => {
 // Get daily order count
 router.get('/daily-count', async (req, res) => {
   try {
-    const register = await Register.findOne({ isOpen: true });
+    const cashierId = req.user?.userId;
+    const register = await Register.findOne({ isOpen: true, cashier: cashierId });
     if (!register) {
       return res.status(400).json({ message: 'Register is not open' });
     }
@@ -78,7 +81,10 @@ router.get('/daily-count', async (req, res) => {
 // Replace the existing POST route with this updated version:
 router.post('/', async (req, res) => {
   console.log(req.body);
-  
+  const casherId = req.user?.userId;
+  if (!casherId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
   const { amountPaid = 0 } = req.body; // Add amountPaid to request body
   
   const order = new Order({
@@ -97,12 +103,13 @@ router.post('/', async (req, res) => {
     // Populate the product and variant data before sending response
     await newOrder.populate('items.product');
     await newOrder.populate('items.variant');
-    
+        await Register.findOneAndUpdate(
+          { isOpen: true, sessionId: req.body.registerSession },
+          { $push: { orders: newOrder._id }}
+        );  
     // Update register total sales with only the amount actually paid
-    await Register.findOneAndUpdate(
-      { isOpen: true },
-      { $inc: { totalSales: amountPaid } }
-    );
+    await updateRegister(req.body.registerSession);
+
 
     res.status(201).json(newOrder);
   } catch (error) {
@@ -113,10 +120,12 @@ router.post('/', async (req, res) => {
 
 
 // Update the daily sales route to only count actual payments received
-router.get('/daily-sales/:sessionId', async (req, res) => {
+router.get('/daily-sales/:sessionId',hasAccess("isCashier"), async (req, res) => {
   try {
     const { sessionId } = req.params;
-    
+    const {userId} = req.user;
+    console.log("Session ID:", sessionId);
+    console.log("User ID:", userId);
     const result = await Order.aggregate([
   {
     $match: {
@@ -179,258 +188,65 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
     };
     res.json(dailyStats);
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-// Delete order
-router.delete('/:id', async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-
-    // Update register total sales
-    await Register.findOneAndUpdate(
-      { isOpen: true },
-      { $inc: { totalSales: -order.finalPrice } }
-    );
-
-    await order.deleteOne();
-    res.json({ message: 'Order deleted' });
-  } catch (error) {
+    console.error('Error fetching daily sales:', error);
     res.status(500).json({ message: error.message });
   }
 });
 
 
-// Summary & Analytics
-// Get summary data with filters - FIXED VERSION
-router.get('/summary', async (req, res) => {
-  try {
-    const { period, startDate, endDate } = req.query;
-    
-    let dateFilter = {};
-    const now = new Date();
-    
-    // Build date filter based on period
-    switch (period) {
-      case 'today':
-        dateFilter = {
-          dateOrdered: {
-            $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-            $lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-          }
-        };
-        break;
-      case 'weekly':
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay());
-        weekStart.setHours(0, 0, 0, 0);
-        dateFilter = { dateOrdered: { $gte: weekStart } };
-        break;
-      case 'monthly':
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        dateFilter = { dateOrdered: { $gte: monthStart } };
-        break;
-      case 'quarterly':
-        const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-        dateFilter = { dateOrdered: { $gte: quarterStart } };
-        break;
-      case 'yearly':
-        const yearStart = new Date(now.getFullYear(), 0, 1);
-        dateFilter = { dateOrdered: { $gte: yearStart } };
-        break;
-      case 'custom':
-        if (startDate && endDate) {
-          dateFilter = {
-            dateOrdered: {
-              $gte: new Date(startDate),
-              $lte: new Date(endDate)
-            }
-          };
-        }
-        break;
-      default: // 'all'
-        dateFilter = {};
-    }
+  // Update payment for an order - PATCH route
+  router.patch('/:id/payment', async (req, res) => {
+    try {
+      const cashierId = req.user?.userId;
+      const { id } = req.params;
+      const { amountReceived } = req.body;
 
-    // Get summary statistics
-    const summaryData = await Order.aggregate([
-      { $match: dateFilter },
-      {
-        $group: {
-          _id: null,
-          totalSales: { $sum: '$finalPrice' },
-          totalOrders: { $sum: 1 },
-          totalItems: { 
-            $sum: { 
-              $reduce: {
-                input: '$items',
-                initialValue: 0,
-                in: { $add: ['$$value', '$$this.quantity'] }
-              }
-            }
-          },
-          avgOrderValue: { $avg: '$finalPrice' }
-        }
+      // Validate input
+      if (!amountReceived || amountReceived <= 0) {
+        return res.status(400).json({ message: 'Amount received must be greater than 0' });
       }
-    ]);
 
-    // Get recent orders
-    const recentOrders = await Order.find(dateFilter)
-      .sort({ dateOrdered: -1 })
-      .limit(50)
-      .populate('items.product')
-      .populate('items.variant');
-
-    // Calculate daily average if not 'all' period
-    let dailyAverage = 0;
-    if (period !== 'all' && summaryData.length > 0) {
-      const daysDiff = period === 'today' ? 1 : Math.ceil((now - new Date(startDate || getStartDateByPeriod(period))) / (1000 * 60 * 60 * 24));
-      dailyAverage = summaryData[0].totalSales / Math.max(daysDiff, 1);
-    }
-
-    const result = summaryData.length > 0 ? {
-      ...summaryData[0],
-      dailyAverage: Math.round(dailyAverage),
-      recentOrders
-    } : {
-      totalSales: 0,
-      totalOrders: 0,
-      totalItems: 0,
-      avgOrderValue: 0,
-      dailyAverage: 0,
-      recentOrders: []
-    };
-
-    res.json(result);
-  } catch (error) {
-    console.error('Error fetching summary:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-
-
-// Helper function to build date filter
-function buildDateFilter(period, startDate, endDate) {
-  const now = new Date();
-  
-  switch (period) {
-    case 'today':
-      return {
-        dateOrdered: {
-          $gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-          $lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-        }
-      };
-    case 'weekly':
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay());
-      weekStart.setHours(0, 0, 0, 0);
-      return { dateOrdered: { $gte: weekStart } };
-    case 'monthly':
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { dateOrdered: { $gte: monthStart } };
-    case 'quarterly':
-      const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-      return { dateOrdered: { $gte: quarterStart } };
-    case 'yearly':
-      const yearStart = new Date(now.getFullYear(), 0, 1);
-      return { dateOrdered: { $gte: yearStart } };
-    case 'custom':
-      if (startDate && endDate) {
-        return {
-          dateOrdered: {
-            $gte: new Date(startDate),
-            $lte: new Date(endDate)
-          }
-        };
+      // Find the order
+      const order = await Order.findById(id);
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
       }
-      break;
-    default:
-      return {};
-  }
-}
 
-// Update payment for an order - PATCH route
-router.patch('/:id/payment', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { amountReceived } = req.body;
+      // Check if payment amount is valid
+      if (amountReceived > order.outstandingPayment) {
+        return res.status(400).json({ 
+          message: `Amount cannot exceed outstanding payment of PKR ${order.outstandingPayment}` 
+        });
+      }
 
-    // Validate input
-    if (!amountReceived || amountReceived <= 0) {
-      return res.status(400).json({ message: 'Amount received must be greater than 0' });
-    }
+      // Update the payment
+      const newAmountPaid = order.amountPaid + amountReceived;
+      const newOutstandingPayment = order.finalPrice - newAmountPaid;
+      const newPaymentStatus = newOutstandingPayment <= 0 ? 'paid' : 'pending';
 
-    // Find the order
-    const order = await Order.findById(id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
+      // Update the order
+      const updatedOrder = await Order.findByIdAndUpdate(
+        id,
+        {
+          amountPaid: newAmountPaid,
+          outstandingPayment: Math.max(0, newOutstandingPayment),
+          paymentStatus: newPaymentStatus
+        },
+        { new: true }
+      ).populate('items.product').populate('items.variant');
+    // Update register total sales with only the amount actually paid
+      await updateRegister(order.registerSession);
 
-    // Check if payment amount is valid
-    if (amountReceived > order.outstandingPayment) {
-      return res.status(400).json({ 
-        message: `Amount cannot exceed outstanding payment of PKR ${order.outstandingPayment}` 
+      res.json({
+        success: true,
+        order: updatedOrder,
+        message: `Payment of PKR ${amountReceived} recorded successfully`
       });
+
+    } catch (error) {
+      console.error('Payment update error:', error);
+      res.status(500).json({ message: error.message });
     }
-
-    // Update the payment
-    const newAmountPaid = order.amountPaid + amountReceived;
-    const newOutstandingPayment = order.finalPrice - newAmountPaid;
-    const newPaymentStatus = newOutstandingPayment <= 0 ? 'paid' : 'pending';
-
-    // Update the order
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      {
-        amountPaid: newAmountPaid,
-        outstandingPayment: Math.max(0, newOutstandingPayment),
-        paymentStatus: newPaymentStatus
-      },
-      { new: true }
-    ).populate('items.product').populate('items.variant');
-
-    // Update register total sales only for the newly received amount
-    // (since we're now tracking actual cash received)
-    await Register.findOneAndUpdate(
-      { isOpen: true },
-      { $inc: { totalSales: amountReceived } }
-    );
-
-    res.json({
-      success: true,
-      order: updatedOrder,
-      message: `Payment of PKR ${amountReceived} recorded successfully`
-    });
-
-  } catch (error) {
-    console.error('Payment update error:', error);
-    res.status(500).json({ message: error.message });
-  }
 });
-
-
-
-function getStartDateByPeriod(period) {
-  const now = new Date();
-  switch (period) {
-    case 'weekly':
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay());
-      return weekStart;
-    case 'monthly':
-      return new Date(now.getFullYear(), now.getMonth(), 1);
-    case 'quarterly':
-      return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-    case 'yearly':
-      return new Date(now.getFullYear(), 0, 1);
-    default:
-      return now;
-  }
-}
 
 module.exports = router; 

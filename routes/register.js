@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Register, MANAGERS } = require('../models/Register');
+const Register = require('../models/Register');
 const Order = require('../models/Order');
 const Expense = require('../models/Expense');
+const Employee = require('../models/Employees');
 const { v4: uuidv4 } = require('uuid');
 const authenticate = require('../middleware/authenticate');
 
@@ -11,7 +12,8 @@ router.use(authenticate);
 // Get available managers
 router.get('/managers', async (req, res) => {
   try {
-    res.json({ managers: MANAGERS });
+    const managers = await Employee.find({ role: 'manager' }).select('_id name email');
+    res.json({ managers });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -20,7 +22,8 @@ router.get('/managers', async (req, res) => {
 // Get register status and session data
 router.get('/status', async (req, res) => {
   try {
-    const register = await Register.findOne({ isOpen: true })
+    const cashierId = req.user?.userId;
+    const register = await Register.findOne({ isOpen: true, cashier: cashierId })
       .populate('orders')
       .populate('expenses');
     
@@ -41,35 +44,44 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// Open register
+// Open register for a specific cashier and manager
 router.post('/open', async (req, res) => {
   try {
-    const existingRegister = await Register.findOne({ isOpen: true });
-    if (existingRegister) {
-      return res.status(400).json({ message: 'Register is already open' });
+    const cashierId = req.user?.userId;
+    if (!cashierId) {
+      return res.status(401).json({ message: 'Unauthorized: cashier ID missing' });
     }
 
-    const { startCash, manager } = req.body;
-    
+    const existingRegister = await Register.findOne({ isOpen: true, cashier: cashierId });
+    if (existingRegister) {
+      return res.status(400).json({ message: 'You already have an open register' });
+    }
+
+    const { startCash, managerId } = req.body;
+
     if (startCash === undefined || startCash < 0) {
       return res.status(400).json({ message: 'Starting cash amount is required and must be positive' });
     }
 
-    if (!manager) {
-      return res.status(400).json({ message: 'Manager is required' });
+    if (!managerId) {
+      return res.status(400).json({ message: 'Manager ID is required' });
     }
 
-    if (!MANAGERS.includes(manager)) {
-      return res.status(400).json({ message: 'Invalid manager selection' });
+    // Validate manager by ID
+    const manager = await Employee.findOne({ _id: managerId, role: 'manager' });
+    if (!manager) {
+      return res.status(400).json({ message: 'Invalid manager ID or role' });
     }
 
     const register = new Register({
       sessionId: uuidv4(),
-      manager: manager,
       isOpen: true,
       openedAt: new Date(),
-      startCash: startCash,
+      startCash,
       openingBalance: startCash,
+      manager: manager.name,
+      managerRef: manager._id,
+      cashier: cashierId,
       expenses: [],
       orders: [],
       lastActivity: new Date()
@@ -78,15 +90,17 @@ router.post('/open', async (req, res) => {
     const newRegister = await register.save();
     res.status(201).json(newRegister);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
+
 
 // Close register
 // Close register
 router.post('/close', async (req, res) => {
   try {
-    const register = await Register.findOne({ isOpen: true })
+    const cashierId = req.user?.userId;
+    const register = await Register.findOne({ isOpen: true, cashier: cashierId })
       .populate('orders')
       .populate('expenses');
     
@@ -101,23 +115,23 @@ router.post('/close', async (req, res) => {
     }
 
     // Get all orders and expenses for this session
-    const sessionOrders = await Order.find({ registerSession: register.sessionId });
-    const sessionExpenses = await Expense.find({ registerSession: register.sessionId });
+    // const sessionOrders = await Order.find({ registerSession: register.sessionId });
+    // const sessionExpenses = await Expense.find({ registerSession: register.sessionId });
 
     // Calculate cash payment totals
-    const cashOrders = sessionOrders.filter(order => order.paymentType === 'cash');
+    const cashOrders = register.orders.filter(order => order.paymentType === 'cash');
     const cashRecvd = cashOrders.reduce((sum, order) => sum + order.amountPaid, 0);
     const expectedCash = cashOrders.reduce((sum, order) => sum + order.finalPrice, 0);
     console.log(cashOrders)
     // Calculate online payment totals
-    const onlineOrders = sessionOrders.filter(order => order.paymentType === 'online');
+    const onlineOrders = register.orders.filter(order => order.paymentType === 'online');
     const onlineRecvd = onlineOrders.reduce((sum, order) => sum + order.amountPaid, 0);
     const expectedOnline = onlineOrders.reduce((sum, order) => sum + order.finalPrice, 0);
     // console.log(cashOrders)
     
     // Calculate totals
-    const totalSales = sessionOrders.reduce((sum, order) => sum + order.finalPrice, 0);
-    const totalExpenses = sessionExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const totalSales = register.orders.reduce((sum, order) => sum + order.finalPrice, 0);
+    const totalExpenses = register.expenses.reduce((sum, expense) => sum + expense.amount, 0);
     const expectedBalance = register.startCash + expectedCash - totalExpenses;
 
     // Update register with final data
@@ -131,8 +145,6 @@ router.post('/close', async (req, res) => {
     register.expectedOnline = expectedOnline;
     register.cashRecvd = cashRecvd;
     register.onlineRecvd = onlineRecvd;
-    register.orders = sessionOrders.map(order => order._id);
-    register.expenses = sessionExpenses.map(expense => expense._id);
 
     const closedRegister = await register.save();
     res.json(closedRegister);
@@ -214,7 +226,8 @@ router.get('/sessions/:id', async (req, res) => {
 // Update last activity
 router.post('/activity', async (req, res) => {
   try {
-    const register = await Register.findOne({ isOpen: true });
+    const cashierId = req.user?.userId;
+    const register = await Register.findOne({ isOpen: true, cashier: cashierId });
     if (!register) {
       return res.status(400).json({ message: 'Register is not open' });
     }

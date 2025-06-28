@@ -12,8 +12,21 @@ const accountSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
-    minlength: 1 // No password restrictions as requested
+    required: true
+  },
+    access: {
+    isAdmin: { type: Boolean, default: false },
+    isManager: { type: Boolean, default: false },
+    isCashier: { type: Boolean, default: true },
+    canAssignAccount: { type: Boolean, default: false },
+    canAddEmployee: { type: Boolean, default: false },
+    canGenReport: { type: Boolean, default: false },
+    canEditRoles: { type: Boolean, default: false },
+    canDeleteOrders: { type: Boolean, default: false },
+    canDeleteEmployees: { type: Boolean, default: false },
+    canAddExpenses: { type: Boolean, default: false },
+    canViewOrders: { type: Boolean, default: false },
+    canEditProducts: { type: Boolean, default: false }
   },
   refreshTokens: [{
     token: String,
