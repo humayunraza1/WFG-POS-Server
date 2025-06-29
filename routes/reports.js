@@ -4,35 +4,9 @@ const Order = require('../models/Order');
 const Expense = require('../models/Expense');
 const Register = require('../models/Register');
 const Report = require('../models/Report');
+const authenticateManager = require('../middleware/authenticateManager');
 
-// Helper function to get date range
-const getDateRange = (period) => {
-  const now = new Date();
-  const start = new Date();
-  
-  switch (period) {
-    case 'daily':
-      start.setHours(0, 0, 0, 0);
-      break;
-    case 'weekly':
-      start.setDate(now.getDate() - 7);
-      break;
-    case 'monthly':
-      start.setMonth(now.getMonth() - 1);
-      break;
-    case 'quarterly':
-      start.setMonth(now.getMonth() - 3);
-      break;
-    case 'annual':
-      start.setFullYear(now.getFullYear() - 1);
-      break;
-    default:
-      start.setHours(0, 0, 0, 0);
-  }
-  
-  return { start, end: now };
-};
-
+router.use(authenticateManager);
 // // Get report
 // router.get('/:period', async (req, res) => {
 //   try {

@@ -5,7 +5,7 @@ const accountSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    unique: true,
+    unique: true, 
     trim: true,
     minlength: 3,
     maxlength: 50

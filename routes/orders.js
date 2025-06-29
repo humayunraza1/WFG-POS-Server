@@ -11,9 +11,10 @@ router.use(authenticate);
 // Get all orders
 // Update the GET all orders route in orders.js to manually fetch and include register session data
 router.get('/', async (req, res) => {
+  const cashierId = req.user?.userId;
   try {
-    const orders = await Order.find()
-      .sort({ createdAt: -1 }) // Most recent first
+    const orders = await Order.find({ cashier: cashierId })
+      .sort({ createdAt: -1 })
       .populate('items.product')
       .populate('items.variant');
 
@@ -89,6 +90,7 @@ router.post('/', async (req, res) => {
   
   const order = new Order({
     registerSession: req.body.registerSession,
+    cashier: casherId, // Use the authenticated user's ID
     actualPrice: req.body.subtotal, // Calculate actual price
     items: req.body.items,
     discount: req.body.discount,

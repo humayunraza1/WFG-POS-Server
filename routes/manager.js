@@ -7,7 +7,11 @@ const authenticateManager = require('../middleware/authenticateManager');
 const Order = require('../models/Order');
 const Register = require('../models/Register');
 const Employees = require('../models/Employees');
-
+const Product = require('../models/Product');
+const Variant = require('../models/Flavors');
+const getNextProductId = require('../utils/getProdID');
+const Expense = require('../models/Expense');
+const updateRegister = require('../utils/updateRegister');
 const router = express.Router();
 router.use(authenticateManager);
 
@@ -143,6 +147,39 @@ router.get('/daily-count',async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+router.get('/orders', async (req, res) => {
+  try {
+    const orders = await Order.find({})
+      .sort({ createdAt: -1 })
+      .populate('items.product')
+      .populate('items.variant');
+
+    // Manually fetch register session data for each order
+    const ordersWithSessions = await Promise.all(
+      orders.map(async (order) => {
+        const orderObj = order.toObject();
+        if (orderObj.registerSession) {
+          try {
+            const session = await Register.findOne({sessionId: orderObj.registerSession});
+            if (session && session.manager) {
+              orderObj.registerSession = { manager: session.manager };
+            }
+          } catch (err) {
+            console.log(`Could not find session ${orderObj.registerSession}:`, err.message);
+            // Keep the original string if session not found
+          }
+        }
+        return orderObj;
+      })
+    );
+
+    res.json(ordersWithSessions);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 
 // Delete order
 router.delete('/delete-order/:id',hasAccess("canDeleteOrders"), async (req, res) => {
@@ -310,6 +347,254 @@ router.get('/employees', async (req, res) => {
 
     res.json(employees);
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Add/Update products
+
+router.post('/add-product', async (req, res) => {
+  try {
+    const newProductId = await getNextProductId();
+    console.log('New Product ID:', newProductId);
+    console.log(req.body)
+    const product = new Product({
+      customId: newProductId,
+      name: req.body.name,
+      imageUrl: req.body.imageUrl
+    });
+
+    const savedProduct = await product.save();
+    // Save variants
+    const variantDocs = await Promise.all(req.body.variants.map(async (variant, index) => {
+      return await new Variant({
+        customId: `${newProductId}-${index + 1}`,
+        name: variant.name,
+        price: variant.price,
+        imageUrl: variant.imageUrl,
+        product: savedProduct._id
+      }).save();
+    }));
+
+    res.status(201).json({ product: savedProduct, variants: variantDocs });
+  } catch (error) {
+    console.error('Error creating product:', error);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Update product
+// Update product
+router.patch('/edit-product/:id',hasAccess("canEditProducts"), async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Update basic product fields
+    if (req.body.name) product.name = req.body.name;
+    if (req.body.imageUrl) product.imageUrl = req.body.imageUrl;
+
+    await product.save();
+
+    // Optional: update variants if provided
+    if (req.body.variants && Array.isArray(req.body.variants)) {
+      // Option 1: Delete all and re-add (simple & clean)
+      await Variant.deleteMany({ product: product._id });
+
+      const updatedVariants = await Promise.all(
+        req.body.variants.map((variant, index) =>
+          new Variant({
+            customId: `${product.customId}-${index + 1}`,
+            name: variant.name,
+            price: variant.price,
+            imageUrl: variant.imageUrl,
+            product: product._id
+          }).save()
+        )
+      );
+
+      return res.json({ product, variants: updatedVariants });
+    }
+
+    res.json(product);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Expenses
+
+// Get all expenses
+router.get('/expenses', async (req, res) => {
+  try {
+    const expenses = await Expense.find();
+    res.json(expenses);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Add new expense
+router.post('/add-expense',hasAccess("canAddExpense"), async (req, res) => {
+  const expense = new Expense({
+    registerSession: req.body.registerSession,
+    name: req.body.name,
+    amount: req.body.amount
+  });
+
+  try {
+    const newExpense = await expense.save();
+      // Update register total expenses
+    await Register.findOneAndUpdate(
+      { isOpen: true, sessionId: req.body.registerSession },
+      { $push: { expenses: newExpense._id }}
+    );  
+  await updateRegister(req.body.registerSession);
+    res.status(201).json(newExpense);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Update expense
+router.put('/update-expense/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, amount } = req.body;
+    
+    // Get the old expense to calculate the difference
+    const oldExpense = await Expense.findById(id);
+    if (!oldExpense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+    
+    const amountDifference = amount - oldExpense.amount;
+    
+    // Update the expense
+    const updatedExpense = await Expense.findByIdAndUpdate(
+      id,
+      { name, amount },
+      { new: true }
+    );
+    
+    // Update register total expenses with the difference
+    await updateRegister(oldExpense.registerSession);
+
+
+    res.json(updatedExpense);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// Delete expense
+router.delete('/delete-expense/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the expense to subtract its amount from register
+    const expense = await Expense.findById(id);
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+    await Register.findOneAndUpdate(
+      { isOpen: true, sessionId: expense.registerSession },
+      { $pull: { expenses: expense._id } }
+    );
+    // Delete the expense
+    await Expense.findByIdAndDelete(id);
+    
+  await updateRegister(req.body.registerSession);
+    
+    res.json({ message: 'Expense deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Register Sessions
+// Get all register sessions with optional date filtering and manager filtering
+router.get('/register/sessions', async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const account = await Account.findById(userId);
+    const employee = await Employees.findOne({ accountRef: userId });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+    const managerId = employee._id;
+
+    const { startDate, endDate } = req.query;
+    
+    // Build filter object
+    let filter = {};
+    
+    // Date filter
+    if (startDate || endDate) {
+      filter.openedAt = {};
+      if (startDate) {
+        filter.openedAt.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        // Add 1 day to endDate to include the entire end day
+        const endDatePlusOne = new Date(endDate);
+        endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+        filter.openedAt.$lt = endDatePlusOne;
+      }
+    }
+    if (!account.isAdmin) {
+      // If not admin, filter by manager
+      filter.managerRef = managerId;
+    }
+    const sessions = await Register.find(filter)
+      .populate({
+        path: 'orders',
+        populate: {
+          path: 'items.product items.variant',
+          select: 'name price'
+        }
+      })
+      .populate('expenses')
+      .sort({ openedAt: -1 }); // Most recent first
+
+    res.json(sessions);
+  } catch (error) {
+    console.error('Error fetching register sessions:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get a specific register session by ID
+router.get('/register/sessions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const session = await Register.findById(id)
+      .populate({
+        path: 'orders',
+        populate: {
+          path: 'items.product items.variant',
+          select: 'name price'
+        }
+      })
+      .populate('expenses');
+
+    if (!session) {
+      return res.status(404).json({ message: 'Register session not found' });
+    }
+
+    res.json(session);
+  } catch (error) {
+    console.error('Error fetching register session:', error);
     res.status(500).json({ message: error.message });
   }
 });

@@ -5,6 +5,11 @@ const orderSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+ cashier: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Account', // the new cashier user
+        required: false  // allow null for legacy sessions
+ },
   items: [{
     product: {
       type: mongoose.Schema.Types.ObjectId,
