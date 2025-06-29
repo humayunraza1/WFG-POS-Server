@@ -3,8 +3,7 @@ const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
 const Employee = require('../models/Employees');
 const authenticate = require('../middleware/authenticate');
-const hasAccess = require('../middleware/hasAccess');
-const authenticateManager = require('../middleware/authenticateManager');
+const { expandAccess } = require('../utils/accessControl');
 
 const router = express.Router();
 
@@ -114,11 +113,6 @@ router.post('/login', async (req, res) => {
     // Find account
     const account = await Account.findOne({ username });
     const employee = await Employee.findOne({ accountRef: account._id });
-    if (employee && employee.role !== 'cashier') {
-      return res.status(403).json({
-        message: 'Access denied: Only cashier can login'
-      });
-    }
     
     if (!account) {
       return res.status(401).json({ 
@@ -163,7 +157,9 @@ router.post('/login', async (req, res) => {
       message: 'Login successful',
       user: { 
         id: account._id, 
-        username: account.username 
+        username: account.username,
+        role: employee.role,
+        access: expandAccess(account.access)
       }
     });
     
@@ -172,79 +168,79 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ message: 'Server error during login' });
   }
 });
-router.post('/manager/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
+// router.post('/manager/login', async (req, res) => {
+//   try {
+//     const { username, password } = req.body;
     
-    // Validation
-    if (!username || !password) {
-      return res.status(400).json({ 
-        message: 'Username and password are required' 
-      });
-    }
+//     // Validation
+//     if (!username || !password) {
+//       return res.status(400).json({ 
+//         message: 'Username and password are required' 
+//       });
+//     }
     
-    // Find account
-    const account = await Account.findOne({ username });
-    const employee = await Employee.findOne({ accountRef: account._id });
-    if (employee && (employee.role !== 'admin' && employee.role !== 'manager')) {
-      return res.status(403).json({
-        message: 'Access denied: Only cashier can login'
-      });
-    }
+//     // Find account
+//     const account = await Account.findOne({ username });
+//     const employee = await Employee.findOne({ accountRef: account._id });
+//     if (employee && (employee.role !== 'admin' && employee.role !== 'manager')) {
+//       return res.status(403).json({
+//         message: 'Access denied: Only cashier can login'
+//       });
+//     }
     
-    if (!account) {
-      return res.status(401).json({ 
-        message: 'Invalid username or password' 
-      });
-    }
+//     if (!account) {
+//       return res.status(401).json({ 
+//         message: 'Invalid username or password' 
+//       });
+//     }
     
-    // Check password
-    const isPasswordValid = await account.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ 
-        message: 'Invalid username or password' 
-      });
-    }
+//     // Check password
+//     const isPasswordValid = await account.comparePassword(password);
+//     if (!isPasswordValid) {
+//       return res.status(401).json({ 
+//         message: 'Invalid username or password' 
+//       });
+//     }
     
-    // Clean expired tokens
-    await account.cleanExpiredTokens();
+//     // Clean expired tokens
+//     await account.cleanExpiredTokens();
     
-    // Generate new tokens
-    const { accessToken, refreshToken } = generateTokens(account._id,employee.role,account.access);
+//     // Generate new tokens
+//     const { accessToken, refreshToken } = generateTokens(account._id,employee.role,account.access);
     
-    // Store refresh token in database
-    account.refreshTokens.push({ token: refreshToken });
-    await account.save();
+//     // Store refresh token in database
+//     account.refreshTokens.push({ token: refreshToken });
+//     await account.save();
     
-    // Set cookies
-    res.cookie('managerAccessToken', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
+//     // Set cookies
+//     res.cookie('managerAccessToken', accessToken, {
+//       httpOnly: true,
+//       secure: true,
+//       sameSite: 'none',
+//       maxAge: 15 * 60 * 1000 // 15 minutes
+//     });
     
-    res.cookie('managerRefreshToken', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
+//     res.cookie('managerRefreshToken', refreshToken, {
+//       httpOnly: true,
+//       secure: true,
+//       sameSite: 'none',
+//       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+//     });
     
-    res.json({ 
-      message: 'Login successful',
-      user: { 
-        id: account._id, 
-        username: account.username, 
-        role: employee.role
-      }
-    });
+//     res.json({ 
+//       message: 'Login successful',
+//       user: { 
+//         id: account._id, 
+//         username: account.username, 
+//         role: employee.role
+//       }
+//     });
     
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login' });
-  }
-});
+//   } catch (error) {
+//     console.error('Login error:', error);
+//     res.status(500).json({ message: 'Server error during login' });
+//   }
+// });
 
 // GET /me - Check authentication status and refresh token if needed
 router.get('/me', async (req, res) => {
@@ -268,7 +264,8 @@ router.get('/me', async (req, res) => {
             user: { 
               id: account._id, 
               username: account.username, 
-              role: employee.role
+              role: employee.role,
+              access:expandAccess(account.access)
             }
           });
         }

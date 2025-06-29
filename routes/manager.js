@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
 const Employee = require('../models/Employees');
 const hasAccess = require('../middleware/hasAccess');
-const authenticateManager = require('../middleware/authenticateManager');
 const Order = require('../models/Order');
 const Register = require('../models/Register');
 const Employees = require('../models/Employees');
@@ -12,8 +11,9 @@ const Variant = require('../models/Flavors');
 const getNextProductId = require('../utils/getProdID');
 const Expense = require('../models/Expense');
 const updateRegister = require('../utils/updateRegister');
+const authenticate = require('../middleware/authenticate');
 const router = express.Router();
-router.use(authenticateManager);
+router.use(authenticate);
 
 // JWT Secret keys (in production, use environment variables)
 const JWT_SECRET = process.env.JWT_SECRET 
@@ -148,7 +148,7 @@ router.get('/daily-count',async (req, res) => {
   }
 });
 
-router.get('/orders', async (req, res) => {
+router.get('/orders',hasAccess("canViewOrders"), async (req, res) => {
   try {
     const orders = await Order.find({})
       .sort({ createdAt: -1 })
@@ -203,11 +203,11 @@ router.delete('/delete-order/:id',hasAccess("canDeleteOrders"), async (req, res)
 });
 
 
-router.get('/registers/active', async (req, res) => {
+router.get('/registers/active',hasAccess("isManager"), async (req, res) => {
   try {
     const managerAccId = req.user.userId;
-    const role = req.user.role;
-    if (role=="manager"){
+    const access = req.user.access;
+    if (!access.isAdmin){
 
       const managerId = await Employees.find({ accountRef: managerAccId }).select('_id');
       const registers = await Register.find({ isOpen: true, managerRef: managerId })
@@ -215,7 +215,7 @@ router.get('/registers/active', async (req, res) => {
       .populate('cashier', 'username');
       
       res.json(registers);
-    }else if (role=="admin") {
+    }else{
       const registers = await Register.find({ isOpen: true })
       .select('sessionId openedAt cashier')
       .populate('cashier', 'username');
@@ -228,15 +228,16 @@ router.get('/registers/active', async (req, res) => {
   }
 });
 
-router.get('/registers/summary', async (req, res) => {
+router.get('/registers/summary',hasAccess("isManager"), async (req, res) => {
   try {
     const { sessionId } = req.query;
     const manager = req.user.userId;
     const role = req.user.role;
       const managerId = await Employees.find({ accountRef: manager }).select('_id');
-
+      const account = await Account.findById(manager);
+      
       let registers = [];
-    if (role == "manager"){
+    if (account.access.isManager && !account.access.isAdmin) {
 
       if (!sessionId || sessionId === 'ALL') {
         // All open registers for the logged-in manager
@@ -259,7 +260,7 @@ router.get('/registers/summary', async (req, res) => {
         
         registers = [register];
       }
-    }else if (role == "admin") {
+    }else if (account.access.isAdmin) {
       if (!sessionId || sessionId === 'ALL') {
         // All open registers for all managers
         registers = await Register.find({ isOpen: true })
@@ -327,18 +328,14 @@ router.get('/registers/summary', async (req, res) => {
 });
 
 // GET /employees
-router.get('/employees', async (req, res) => {
+router.get('/employees',hasAccess("isManager"), async (req, res) => {
   try {
-    const userRole = req.user?.role;
-
-    if (!userRole) {
-      return res.status(401).json({ message: 'Unauthorized: role missing' });
-    }
+    const access = req.user?.access;
 
     let filter = {};
 
     // If the user is a manager, limit to specific visible roles
-    if (userRole === 'manager') {
+    if (!access.isAdmin) {
       filter.role = { $in: ['cashier', 'chef', 'employee', 'cleaner', 'waiter'] };
     }
 
@@ -354,7 +351,7 @@ router.get('/employees', async (req, res) => {
 
 // Add/Update products
 
-router.post('/add-product', async (req, res) => {
+router.post('/add-product',hasAccess("canAddProducts"), async (req, res) => {
   try {
     const newProductId = await getNextProductId();
     console.log('New Product ID:', newProductId);
@@ -428,7 +425,7 @@ router.patch('/edit-product/:id',hasAccess("canEditProducts"), async (req, res) 
 // Expenses
 
 // Get all expenses
-router.get('/expenses', async (req, res) => {
+router.get('/expenses',hasAccess("canViewExpenses"), async (req, res) => {
   try {
     const expenses = await Expense.find();
     res.json(expenses);
@@ -461,7 +458,7 @@ router.post('/add-expense',hasAccess("canAddExpense"), async (req, res) => {
 });
 
 // Update expense
-router.put('/update-expense/:id', async (req, res) => {
+router.put('/update-expense/:id',hasAccess("canEditExpenses"), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, amount } = req.body;
@@ -492,7 +489,7 @@ router.put('/update-expense/:id', async (req, res) => {
 });
 
 // Delete expense
-router.delete('/delete-expense/:id', async (req, res) => {
+router.delete('/delete-expense/:id',hasAccess("canDeleteExpenses"), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -519,7 +516,7 @@ router.delete('/delete-expense/:id', async (req, res) => {
 
 // Register Sessions
 // Get all register sessions with optional date filtering and manager filtering
-router.get('/register/sessions', async (req, res) => {
+router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -551,7 +548,7 @@ router.get('/register/sessions', async (req, res) => {
         filter.openedAt.$lt = endDatePlusOne;
       }
     }
-    if (!account.isAdmin) {
+    if (!account.access.isAdmin) {
       // If not admin, filter by manager
       filter.managerRef = managerId;
     }
@@ -574,10 +571,13 @@ router.get('/register/sessions', async (req, res) => {
 });
 
 // Get a specific register session by ID
-router.get('/register/sessions/:id', async (req, res) => {
+router.get('/register/sessions/:id',hasAccess("isManager"), async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const userId = req.user?.userId;
+    const access = req.user?.access;
+    const manager = await Employees.findOne({ accountRef: userId });
+
     const session = await Register.findById(id)
       .populate({
         path: 'orders',
@@ -587,11 +587,15 @@ router.get('/register/sessions/:id', async (req, res) => {
         }
       })
       .populate('expenses');
-
-    if (!session) {
-      return res.status(404).json({ message: 'Register session not found' });
+    
+      if (!session) {
+        return res.status(404).json({ message: 'Register session not found' });
+      }
+    if (!access.isAdmin){
+      if(session.managerRef.toString() !== manager._id.toString()) {
+        return res.status(403).json({ message: 'Access denied: You do not have permission to view this session' });
     }
-
+  }
     res.json(session);
   } catch (error) {
     console.error('Error fetching register session:', error);

@@ -4,9 +4,10 @@ const Order = require('../models/Order');
 const Expense = require('../models/Expense');
 const Register = require('../models/Register');
 const Report = require('../models/Report');
-const authenticateManager = require('../middleware/authenticateManager');
+const authenticate = require('../middleware/authenticate');
+const hasAccess = require('../middleware/hasAccess');
 
-router.use(authenticateManager);
+router.use(authenticate);
 // // Get report
 // router.get('/:period', async (req, res) => {
 //   try {
@@ -52,7 +53,7 @@ router.use(authenticateManager);
 // Add this to your register.js routes file
 
 // Generate comprehensive report for date range
-router.get('/create-report', async (req, res) => {
+router.get('/create-report',hasAccess("canGenReport"), async (req, res) => {
   try {
     let { startDate, endDate } = req.query;
     
@@ -336,7 +337,7 @@ router.get('/create-report', async (req, res) => {
 });
 
 // Get saved report by ID
-router.get('/get-report/:id', async (req, res) => {
+router.get('/get-report/:id',hasAccess("canViewReport"), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -362,7 +363,7 @@ router.get('/get-report/:id', async (req, res) => {
 });
 
 
-router.get('/', async (req, res) => {
+router.get('/',hasAccess("canViewReport"), async (req, res) => {
   try {
     const reports = await Report.find({}, {
       _id: 1,
