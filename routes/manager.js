@@ -42,7 +42,7 @@ router.post('/add-account', hasAccess("canAssignAccount"), async (req, res) => {
 
     // Filter access flags based on current user's privileges
     const currentAccess = req.user.access || {};
-    const adminOnlyFlags = ['isAdmin', 'isManager', 'canEditRoles', 'canDeleteEmployees','canAssignAccount', 'canAddEmployee', 'canDeleteOrders', 'canViewReports'];
+    const adminOnlyFlags = ['isAdmin', 'isManager', 'canEditRoles', 'canDeleteEmployees','canAssignAccount', 'canAddEmployee', 'canViewReports'];
     const deniedFlags = [];
     const filteredAccess = {};
 
@@ -89,7 +89,7 @@ router.post('/add-employee', hasAccess("canAddEmployee"), async (req, res) => {
       name,
       email,
       salary,
-      number,
+      phone:number,
       role,
       accountRef: null,
     });
@@ -148,39 +148,6 @@ router.get('/daily-count',async (req, res) => {
   }
 });
 
-router.get('/orders',hasAccess("canViewOrders"), async (req, res) => {
-  try {
-    const orders = await Order.find({})
-      .sort({ createdAt: -1 })
-      .populate('items.product')
-      .populate('items.variant');
-
-    // Manually fetch register session data for each order
-    const ordersWithSessions = await Promise.all(
-      orders.map(async (order) => {
-        const orderObj = order.toObject();
-        if (orderObj.registerSession) {
-          try {
-            const session = await Register.findOne({sessionId: orderObj.registerSession});
-            if (session && session.manager) {
-              orderObj.registerSession = { manager: session.manager };
-            }
-          } catch (err) {
-            console.log(`Could not find session ${orderObj.registerSession}:`, err.message);
-            // Keep the original string if session not found
-          }
-        }
-        return orderObj;
-      })
-    );
-
-    res.json(ordersWithSessions);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-
 // Delete order
 router.delete('/delete-order/:id',hasAccess("canDeleteOrders"), async (req, res) => {
   try {
@@ -228,107 +195,77 @@ router.get('/registers/active',hasAccess("isManager"), async (req, res) => {
   }
 });
 
-router.get('/registers/summary',hasAccess("isManager"), async (req, res) => {
+router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
   try {
     const { sessionId } = req.query;
     const manager = req.user.userId;
-    const role = req.user.role;
-      const managerId = await Employees.find({ accountRef: manager }).select('_id');
-      const account = await Account.findById(manager);
-      
-      let registers = [];
-    if (account.access.isManager && !account.access.isAdmin) {
+    const account = await Account.findById(manager);
+    const managerEmp = await Employees.findOne({ accountRef: manager }).select('_id');
 
+    let registers = [];
+
+    if (account.access.isManager && !account.access.isAdmin) {
       if (!sessionId || sessionId === 'ALL') {
         // All open registers for the logged-in manager
-      registers = await Register.find({ isOpen: true, managerRef: managerId })
+        registers = await Register.find({ isOpen: true, managerRef: managerEmp._id })
           .populate({
             path: 'orders',
             populate: [
-              {
-                path: 'items.product',
-                model: 'Product'
-              },
-              {
-                path: 'items.variant',
-                model: 'Variant'
-              }
+              { path: 'items.product', model: 'Product' },
+              { path: 'items.variant', model: 'Variant' }
             ]
           })
-        .populate('expenses')
-        .populate('cashier', 'username');
+          .populate('expenses')
+          .populate('cashier', 'username');
       } else {
-        // Specific session only
-        const register = await Register.findOne({ sessionId })
-      registers = await Register.find({ isOpen: true, managerRef: managerId })
-  .populate({
-    path: 'orders',
-    populate: [
-      {
-        path: 'items.product',
-        model: 'Product'
-      },
-      {
-        path: 'items.variant',
-        model: 'Variant'
+        // Specific session only for the manager (could be multiple)
+        registers = await Register.find({
+          sessionId,
+          isOpen: true,
+          managerRef: managerEmp._id
+        })
+          .populate({
+            path: 'orders',
+            populate: [
+              { path: 'items.product', model: 'Product' },
+              { path: 'items.variant', model: 'Variant' }
+            ]
+          })
+          .populate('expenses')
+          .populate('cashier', 'username');
       }
-    ]
-  })
-        .populate('expenses')
-        .populate('cashier', 'username');
-        
-        console.log("Register found:", register);
-
-        if (!register) {
-          return res.status(404).json({ message: 'Register not found' });
-        }
-        
-        registers = [register];
-      }
-    }else if (account.access.isAdmin) {
+    } else if (account.access.isAdmin) {
       if (!sessionId || sessionId === 'ALL') {
-        // All open registers for all managers
+        // All open registers across all managers
         registers = await Register.find({ isOpen: true })
-  .populate({
-    path: 'orders',
-    populate: [
-      {
-        path: 'items.product',
-        model: 'Product'
-      },
-      {
-        path: 'items.variant',
-        model: 'Variant'
-      }
-    ]
-  })
-        .populate('expenses')
-        .populate('cashier', 'username');
+          .populate({
+            path: 'orders',
+            populate: [
+              { path: 'items.product', model: 'Product' },
+              { path: 'items.variant', model: 'Variant' }
+            ]
+          })
+          .populate('expenses')
+          .populate('cashier', 'username');
       } else {
-        // Specific session only
-        const register = await Register.findOne({ sessionId })
-  .populate({
-    path: 'orders',
-    populate: [
-      {
-        path: 'items.product',
-        model: 'Product'
-      },
-      {
-        path: 'items.variant',
-        model: 'Variant'
-      }
-    ]
-  })
-        .populate('expenses')
-        .populate('cashier', 'username');
-        if (!register) {
-          return res.status(404).json({ message: 'Register not found' });
-        }
-        registers = [register];
+        // Specific session only (could be multiple)
+        registers = await Register.find({ sessionId })
+          .populate({
+            path: 'orders',
+            populate: [
+              { path: 'items.product', model: 'Product' },
+              { path: 'items.variant', model: 'Variant' }
+            ]
+          })
+          .populate('expenses')
+          .populate('cashier', 'username');
       }
     }
-    // Combine stats across one or more registers
+
+    if (!registers || registers.length === 0) {
+      return res.status(404).json({ message: 'No registers found' });
+    }
+
     const combined = {
       sessionCount: registers.length,
       orderCount: 0,
@@ -347,7 +284,10 @@ router.get('/registers/summary',hasAccess("isManager"), async (req, res) => {
     };
 
     registers.forEach(reg => {
-      combined.orderCount += reg.orders.length;
+      const orders = reg.orders || [];
+      const expenses = reg.expenses || [];
+
+      combined.orderCount += orders.length;
       combined.totalSales += reg.totalSales || 0;
       combined.cashRecvd += reg.cashRecvd || 0;
       combined.onlineRecvd += reg.onlineRecvd || 0;
@@ -357,15 +297,16 @@ router.get('/registers/summary',hasAccess("isManager"), async (req, res) => {
       combined.startCash += reg.startCash || 0;
       combined.openingBalance += reg.openingBalance || 0;
       combined.closingBalance += reg.closingBalance || 0;
-      combined.orders.push(...reg.orders);
-      combined.expenses.push(...reg.expenses);
+
+      combined.orders.push(...orders);
+      combined.expenses.push(...expenses);
       combined.registers.push({
         sessionId: reg.sessionId,
         openedAt: reg.openedAt,
         cashier: reg.cashier,
         startCash: reg.startCash,
-        closingBalance: reg.closingBalance? reg.closingBalance : 0,
-        expectedBalance: reg.expectedBalance? reg.expectedBalance : 0,
+        closingBalance: reg.closingBalance || 0,
+        expectedBalance: reg.expectedBalance || 0
       });
     });
 
@@ -389,7 +330,7 @@ router.get('/employees',hasAccess("isManager"), async (req, res) => {
     }
 
     // If the user is admin or company, return all employees
-    const employees = await Employee.find(filter).select('_id name email role phone salary accountRef');
+    const employees = await Employee.find(filter).select('_id name email role phone salary accountRef').populate('accountRef', 'username');
 
     res.json(employees);
   } catch (error) {
@@ -400,7 +341,7 @@ router.get('/employees',hasAccess("isManager"), async (req, res) => {
 
 // Add/Update products
 
-router.post('/add-product',hasAccess("canAddProducts"), async (req, res) => {
+router.post('/add-product',hasAccess("canManageProducts"), async (req, res) => {
   try {
     const newProductId = await getNextProductId();
     console.log('New Product ID:', newProductId);
@@ -432,7 +373,7 @@ router.post('/add-product',hasAccess("canAddProducts"), async (req, res) => {
 
 // Update product
 // Update product
-router.patch('/edit-product/:id',hasAccess("canEditProducts"), async (req, res) => {
+router.patch('/edit-product/:id',hasAccess("canManageProducts"), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {
@@ -474,7 +415,7 @@ router.patch('/edit-product/:id',hasAccess("canEditProducts"), async (req, res) 
 // Expenses
 
 // Get all expenses
-router.get('/expenses',hasAccess("canViewExpenses"), async (req, res) => {
+router.get('/expenses',hasAccess("canManageExpenses"), async (req, res) => {
   try {
     const expenses = await Expense.find();
     res.json(expenses);
@@ -485,7 +426,7 @@ router.get('/expenses',hasAccess("canViewExpenses"), async (req, res) => {
 
 
 // Add new expense
-router.post('/add-expense',hasAccess("canAddExpense"), async (req, res) => {
+router.post('/add-expense',hasAccess("canManageExpense"), async (req, res) => {
   const expense = new Expense({
     registerSession: req.body.registerSession,
     name: req.body.name,
@@ -507,7 +448,7 @@ router.post('/add-expense',hasAccess("canAddExpense"), async (req, res) => {
 });
 
 // Update expense
-router.put('/update-expense/:id',hasAccess("canEditExpenses"), async (req, res) => {
+router.put('/update-expense/:id',hasAccess("canManageExpenses"), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, amount } = req.body;
@@ -538,7 +479,7 @@ router.put('/update-expense/:id',hasAccess("canEditExpenses"), async (req, res) 
 });
 
 // Delete expense
-router.delete('/delete-expense/:id',hasAccess("canDeleteExpenses"), async (req, res) => {
+router.delete('/delete-expense/:id',hasAccess("canManageExpenses"), async (req, res) => {
   try {
     const { id } = req.params;
     
