@@ -241,14 +241,39 @@ router.get('/registers/summary',hasAccess("isManager"), async (req, res) => {
 
       if (!sessionId || sessionId === 'ALL') {
         // All open registers for the logged-in manager
-        registers = await Register.find({ isOpen: true, managerRef: managerId })
-        .populate('orders')
+      registers = await Register.find({ isOpen: true, managerRef: managerId })
+          .populate({
+            path: 'orders',
+            populate: [
+              {
+                path: 'items.product',
+                model: 'Product'
+              },
+              {
+                path: 'items.variant',
+                model: 'Variant'
+              }
+            ]
+          })
         .populate('expenses')
         .populate('cashier', 'username');
       } else {
         // Specific session only
         const register = await Register.findOne({ sessionId })
-        .populate('orders')
+      registers = await Register.find({ isOpen: true, managerRef: managerId })
+  .populate({
+    path: 'orders',
+    populate: [
+      {
+        path: 'items.product',
+        model: 'Product'
+      },
+      {
+        path: 'items.variant',
+        model: 'Variant'
+      }
+    ]
+  })
         .populate('expenses')
         .populate('cashier', 'username');
         
@@ -264,13 +289,37 @@ router.get('/registers/summary',hasAccess("isManager"), async (req, res) => {
       if (!sessionId || sessionId === 'ALL') {
         // All open registers for all managers
         registers = await Register.find({ isOpen: true })
-        .populate('orders')
+  .populate({
+    path: 'orders',
+    populate: [
+      {
+        path: 'items.product',
+        model: 'Product'
+      },
+      {
+        path: 'items.variant',
+        model: 'Variant'
+      }
+    ]
+  })
         .populate('expenses')
         .populate('cashier', 'username');
       } else {
         // Specific session only
         const register = await Register.findOne({ sessionId })
-        .populate('orders')
+  .populate({
+    path: 'orders',
+    populate: [
+      {
+        path: 'items.product',
+        model: 'Product'
+      },
+      {
+        path: 'items.variant',
+        model: 'Variant'
+      }
+    ]
+  })
         .populate('expenses')
         .populate('cashier', 'username');
         if (!register) {
