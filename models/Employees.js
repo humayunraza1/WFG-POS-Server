@@ -23,9 +23,16 @@ const employeeSchema = new mongoose.Schema({
     required: true,
     enum: ['cashier', 'manager', 'chef', 'waiter', 'cleaner', 'company','admin']
   },
+    salaryCycleStartDay: {
+    type: Number,
+    min: 1,
+    max: 28,
+    default: 1 // <-- NEW
+  },
   accountRef: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Account'
+    ref: 'Account',
+    default: null
   }
 }, { timestamps: true });
 

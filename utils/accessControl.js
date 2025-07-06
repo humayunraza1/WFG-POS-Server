@@ -4,7 +4,7 @@ function expandAccess(access) {
 const allAccess = {
   isAdmin: true,
   isManager: true,
-  isCashier: true,
+  isCashier: false,
     canViewOrders: true,
     canDeleteOrders: true,
     canAssignAccount: true ,
@@ -19,6 +19,7 @@ const allAccess = {
 
 const managerAccess = {
     canViewOrders: true,
+    isCashier: false,
     canDeleteOrders: true,
     canAssignAccount: true ,
     canViewEmployees: true ,

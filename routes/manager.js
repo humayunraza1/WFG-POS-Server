@@ -83,13 +83,14 @@ router.post('/add-account', hasAccess("canAssignAccount"), async (req, res) => {
 
 router.post('/add-employee', hasAccess("canAddEmployee"), async (req, res) => {
   try {
-    const { name, email, salary,number, role} = req.body;
+    const { name, email, salary,number, role, salaryDate} = req.body;
 
     const addEmployee = new Employee({
       name,
       email,
       salary,
       phone:number,
+      salaryCycleStartDay:salaryDate,
       role,
       accountRef: null,
     });
@@ -102,7 +103,7 @@ router.post('/add-employee', hasAccess("canAddEmployee"), async (req, res) => {
 
   } catch (error) {
     console.error('Admin creation error:', error);
-    res.status(500).json({ message: 'Server error during account creation' });
+    res.status(500).json({ message: 'Server error during account creation' });  
   }
 });
 

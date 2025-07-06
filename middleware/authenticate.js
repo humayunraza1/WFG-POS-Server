@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
 const { expandAccess } = require('../utils/accessControl');
+const Login = require('../models/Login');
 
 const JWT_SECRET = process.env.JWT_SECRET 
 const REFRESH_SECRET = process.env.REFRESH_SECRET
@@ -18,7 +19,7 @@ const authenticate = async (req, res, next) => {
     if (accessToken) {
       try {
         const decoded = jwt.verify(accessToken, JWT_SECRET);
-        const account = await Account.findById(decoded.userId).select('-password -refreshTokens');
+        const account = await Account.findById(decoded.userId).select('-password');
     if (account) {
       try{
           req.user = {
@@ -49,7 +50,7 @@ const authenticate = async (req, res, next) => {
         }
         
         // Check if refresh token exists in database
-        const tokenExists = account.refreshTokens.some(tokenObj => tokenObj.token === refreshToken);
+        const tokenExists = await Login.findOne({ accountRef: account._id, refreshToken });
         if (!tokenExists) {
           return res.status(401).json({ message: 'Invalid refresh token' });
         }

@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const Account = require('../models/Account');
 const Employee = require('../models/Employees');
+const Login = require('../models/Login');
 const authenticate = require('../middleware/authenticate');
 const { expandAccess } = require('../utils/accessControl');
 
@@ -128,15 +129,14 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    // Clean expired tokens
-    await account.cleanExpiredTokens();
-    
     // Generate new tokens
     const { accessToken, refreshToken } = generateTokens(account._id,employee.role);
     
     // Store refresh token in database
-    account.refreshTokens.push({ token: refreshToken });
-    await account.save();
+        await new Login({
+      accountRef: account._id,
+      refreshToken
+    }).save();
     
     // Set cookies
     res.cookie('accessToken', accessToken, {
@@ -256,7 +256,7 @@ router.get('/me', async (req, res) => {
     if (accessToken) {
       try {
         const decoded = jwt.verify(accessToken, JWT_SECRET);
-        const account = await Account.findById(decoded.userId).select('-password -refreshTokens');
+        const account = await Account.findById(decoded.userId).select('-password');
         const employee = await Employee.findOne({ accountRef: account._id });
         
         if (account) {
@@ -280,19 +280,20 @@ router.get('/me', async (req, res) => {
       try {
         const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
         const account = await Account.findById(decoded.userId);
-        
+        const employee = await Employee.findOne({ accountRef: account._id });
+
         if (!account) {
           return res.status(401).json({ message: 'Account not found' });
         }
         
         // Check if refresh token exists in database
-        const tokenExists = account.refreshTokens.some(tokenObj => tokenObj.token === refreshToken);
+        const tokenExists = await Login.findOne({ accountRef: account._id, refreshToken });
         if (!tokenExists) {
           return res.status(401).json({ message: 'Invalid refresh token' });
         }
         
         // Generate new access token
-        const { accessToken: newAccessToken } = generateTokens(account._id);
+        const { accessToken: newAccessToken } = generateTokens(account._id,employee?.role, account.access);
         
         // Set new access token cookie
         res.cookie('accessToken', newAccessToken, {

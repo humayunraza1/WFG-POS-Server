@@ -17,7 +17,7 @@ const accountSchema = new mongoose.Schema({
     access: {
     isAdmin: { type: Boolean, default: false },
     isManager: { type: Boolean, default: false },
-    isCashier: { type: Boolean, default: true },
+    isCashier: { type: Boolean, default: false},
     canViewOrders: { type: Boolean, default: false },
     canDeleteOrders: { type: Boolean, default: false },
     canAssignAccount: { type: Boolean, default: false },
@@ -29,14 +29,6 @@ const accountSchema = new mongoose.Schema({
     canManageExpenses: { type: Boolean, default: false },
     canManageProducts: { type: Boolean, default: false },
   },
-  refreshTokens: [{
-    token: String,
-    createdAt: {
-      type: Date,
-      default: Date.now,
-      expires: 604800 // 7 days
-    }
-  }]
 }, {
   timestamps: true
 });
@@ -58,19 +50,4 @@ accountSchema.pre('save', async function(next) {
 accountSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
-
-// Remove refresh token method
-accountSchema.methods.removeRefreshToken = function(tokenToRemove) {
-  this.refreshTokens = this.refreshTokens.filter(tokenObj => tokenObj.token !== tokenToRemove);
-  return this.save();
-};
-
-// Clean expired refresh tokens
-accountSchema.methods.cleanExpiredTokens = function() {
-  this.refreshTokens = this.refreshTokens.filter(tokenObj => 
-    new Date() < new Date(tokenObj.createdAt.getTime() + 7 * 24 * 60 * 60 * 1000)
-  );
-  return this.save();
-};
-
 module.exports = mongoose.model('Account', accountSchema);
