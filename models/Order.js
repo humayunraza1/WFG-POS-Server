@@ -5,27 +5,41 @@ const orderSchema = new mongoose.Schema({
     type: String,
     required: true
   },
- cashier: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Account', // the new cashier user
-        required: false  // allow null for legacy sessions
- },
+  cashier: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Account',
+    required: false
+  },
   items: [{
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      required: true
+    },
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Product',
       required: true
     },
-    variant: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Variant',
+    optionName: {
+      type: String,
       required: true
+    },
+    unitPrice: {
+      type: Number,
+      required: true,
+      min: 0
     },
     quantity: {
       type: Number,
       required: true,
       min: 1
     },
+    totalPrice: {
+      type: Number,
+      required: true,
+      min: 0
+    }
   }],
   discount: {
     type: Number,
@@ -54,7 +68,7 @@ const orderSchema = new mongoose.Schema({
   },
   outstandingPayment: {
     type: Number,
-    default: function() {
+    default: function () {
       return this.finalPrice;
     },
     min: 0
@@ -72,12 +86,11 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Pre-save middleware to calculate payment status and outstanding payment
-orderSchema.pre('save', function(next) {
+orderSchema.pre('save', function (next) {
   if (this.amountPaid >= this.finalPrice) {
     this.paymentStatus = 'paid';
     this.outstandingPayment = 0;
-    this.amountPaid = this.finalPrice; // Prevent overpayment
+    this.amountPaid = this.finalPrice;
   } else {
     this.paymentStatus = 'pending';
     this.outstandingPayment = this.finalPrice - this.amountPaid;
