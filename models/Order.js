@@ -21,6 +21,10 @@ const orderSchema = new mongoose.Schema({
       ref: 'Product',
       required: true
     },
+   option: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true
+    },
     optionName: {
       type: String,
       required: true

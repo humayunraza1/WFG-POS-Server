@@ -16,6 +16,7 @@ const productSchema = new mongoose.Schema({
     required: true
   },
   options: [{
+    _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
     name: { type: String, required: true },    // e.g. "Normal", "With Ice Cream"
     price: { type: Number, required: true, min: 0 }
   }]

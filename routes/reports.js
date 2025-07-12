@@ -219,7 +219,7 @@ router.get('/create-report',hasAccess("canGenReport"), async (req, res) => {
       dateOrdered: { $gte: start, $lte: end }
     })
     .populate('items.product')
-    .populate('items.variant')
+    .populate('items.category')
     .sort({ dateOrdered: -1 });
 
     const allExpenses = await Expense.find({
@@ -345,7 +345,7 @@ router.get('/get-report/:id',hasAccess("canViewReport"), async (req, res) => {
       .populate({
         path: 'orders',
         populate: {
-          path: 'items.product items.variant',
+          path: 'items.product items.category',
           select: 'name price'
         }
       })

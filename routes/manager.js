@@ -210,8 +210,8 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
           .populate({
             path: 'orders',
             populate: [
-              { path: 'items.product', model: 'Product' },
-              { path: 'items.variant', model: 'Variant' }
+              { path: 'items.product', select: 'name' },
+              { path: 'items.category', select: 'name' }
             ]
           })
           .populate('expenses')
@@ -226,8 +226,8 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
           .populate({
             path: 'orders',
             populate: [
-              { path: 'items.product', model: 'Product' },
-              { path: 'items.variant', model: 'Variant' }
+              { path: 'items.product', select: 'name' },
+              { path: 'items.category', select: 'name' }
             ]
           })
           .populate('expenses')
@@ -240,8 +240,8 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
           .populate({
             path: 'orders',
             populate: [
-              { path: 'items.product', model: 'Product' },
-              { path: 'items.variant', model: 'Variant' }
+              { path: 'items.product', select: 'name' },
+              { path: 'items.category', select: 'name' }
             ]
           })
           .populate('expenses')
@@ -252,8 +252,8 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
           .populate({
             path: 'orders',
             populate: [
-              { path: 'items.product', model: 'Product' },
-              { path: 'items.variant', model: 'Variant' }
+              { path: 'items.product', select: 'name' },
+              { path: 'items.category', select: 'name' }
             ]
           })
           .populate('expenses')
@@ -545,7 +545,7 @@ router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
       .populate({
         path: 'orders',
         populate: {
-          path: 'items.product items.variant',
+          path: 'items.product items.category',
           select: 'name price'
         }
       })
@@ -571,7 +571,7 @@ router.get('/register/sessions/:id',hasAccess("isManager"), async (req, res) => 
       .populate({
         path: 'orders',
         populate: {
-          path: 'items.product items.variant',
+          path: 'items.product items.category',
           select: 'name price'
         }
       })
