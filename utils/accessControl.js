@@ -7,7 +7,8 @@ const allAccess = {
   isCashier: false,
     canViewOrders: true,
     canDeleteOrders: true,
-    canAssignAccount: true ,
+    canAssignAccount: true,
+    canViewAllRegisters: true,
     canViewEmployees: true ,
     canAddEmployee: true ,
     canDeleteEmployees: true ,
@@ -18,7 +19,6 @@ const allAccess = {
 };
 
 const managerAccess = {
-    canViewOrders: true,
     isCashier: false,
     canDeleteOrders: true,
     canAssignAccount: true ,
@@ -28,7 +28,6 @@ const managerAccess = {
     canEditRoles: true,
     canGenReport:true,
     canManageExpenses:true,
-    canManageProducts: true
 }
 
   if (access.isAdmin) {

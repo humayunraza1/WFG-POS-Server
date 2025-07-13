@@ -79,6 +79,89 @@ router.post('/add-account', hasAccess("canAssignAccount"), async (req, res) => {
   }
 });
 
+// Edit Account
+router.put('/edit-account/:accountId', hasAccess(["canEditRoles", "canAssignAccount"]), async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { username, password, access = {} } = req.body;
+    const currentAccess = req.user.access || {};
+
+    const account = await Account.findById(accountId);
+    if (!account) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+
+    // Only update fields that are provided
+    if (username) {
+      account.username = username;
+    }
+
+    if (password) {
+      account.password = password; // Will be hashed by .pre('save') hook
+    }
+
+    // Handle access updates
+    if (Object.keys(access).length > 0) {
+      if (!currentAccess.canEditRoles) {
+        return res.status(403).json({ message: 'You are not allowed to edit access roles' });
+      }
+
+      const adminOnlyFlags = [
+        'isAdmin', 'isManager', 'canEditRoles', 'canDeleteEmployees', 
+        'canAssignAccount', 'canAddEmployee', 'canViewReports'
+      ];
+      const deniedFlags = [];
+      const updatedAccess = {};
+
+      for (const key in access) {
+        if (adminOnlyFlags.includes(key)) {
+          if (currentAccess.isAdmin) {
+            updatedAccess[key] = access[key];
+          } else if (access[key]) {
+            deniedFlags.push(key); // Flag only if trying to enable a restricted flag
+          }
+        } else {
+          updatedAccess[key] = access[key];
+        }
+      }
+
+      if (deniedFlags.length > 0) {
+        return res.status(403).json({
+          message: 'You are not allowed to assign the following permissions:',
+          denied: deniedFlags
+        });
+      }
+
+      account.access = updatedAccess;
+    }
+
+    await account.save(); // This triggers password hashing if modified
+    res.json({ message: 'Account updated successfully' });
+
+  } catch (error) {
+    console.error('Edit account error:', error);
+    res.status(500).json({ message: 'Server error during account update' });
+  }
+});
+
+router.get('/account/:accountId', hasAccess("canAssignAccount"), async (req, res) => {
+  try {
+    const { accountId } = req.params;
+
+    const account = await Account.findById(accountId);
+    if (!account) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+
+    res.json(account)
+
+  } catch (error) {
+    console.error('Error fetching account:', error);
+    res.status(500).json({ message: 'Server error fetching account details' });
+  }
+});
+
+
 router.post('/add-employee', hasAccess("canAddEmployee"), async (req, res) => {
   try {
     const { name, email, salary,number, role, salaryDate} = req.body;
@@ -173,7 +256,7 @@ router.get('/registers/active',hasAccess("isManager"), async (req, res) => {
   try {
     const managerAccId = req.user.userId;
     const access = req.user.access;
-    if (!access.isAdmin){
+    if (!access.isAdmin && !access.canViewAllRegisters){
 
       const managerId = await Employees.find({ accountRef: managerAccId }).select('_id');
       const registers = await Register.find({ isOpen: true, managerRef: managerId })
@@ -203,7 +286,7 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
 
     let registers = [];
 
-    if (account.access.isManager && !account.access.isAdmin) {
+    if (account.access.isManager && !account.access.isAdmin && !account.access.canViewAllRegisters) {
       if (!sessionId || sessionId === 'ALL') {
         // All open registers for the logged-in manager
         registers = await Register.find({ isOpen: true, managerRef: managerEmp._id })
@@ -233,7 +316,7 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
           .populate('expenses')
           .populate('cashier', 'username');
       }
-    } else if (account.access.isAdmin) {
+    } else if (account.access.isAdmin || account.access.canViewAllRegisters) {
       if (!sessionId || sessionId === 'ALL') {
         // All open registers across all managers
         registers = await Register.find({ isOpen: true })

@@ -19,6 +19,7 @@ const accountSchema = new mongoose.Schema({
     isManager: { type: Boolean, default: false },
     isCashier: { type: Boolean, default: false},
     canViewOrders: { type: Boolean, default: false },
+    canViewAllRegisters: { type: Boolean, default: false },
     canDeleteOrders: { type: Boolean, default: false },
     canAssignAccount: { type: Boolean, default: false },
     canViewEmployees: { type: Boolean, default: false },
