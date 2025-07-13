@@ -29,7 +29,7 @@ const authenticate = async (req, res, next) => {
           return next();
         }
       } catch (error) {
-        console.error('Access token verification error:', error);
+        console.error('access token expired, getting new token');
       }
     }
 

@@ -121,6 +121,55 @@ router.get('/:categoryId', async (req, res) => {
   }
 });
 
+router.post('/bulk-add', hasAccess("canManageProducts"), async (req, res) => {
+  try {
+    const productList = req.body;
+    console.log("bulk add: ",req.body)
+    if (!Array.isArray(productList) || productList.length === 0) {
+      return res.status(400).json({ message: "Request body must be a non-empty array of products." });
+    }
+
+    // Validate and prepare data
+    const categoryIds = [...new Set(productList.map(p => p.categoryId))];
+    const categories = await Category.find({ _id: { $in: categoryIds } });
+
+    const validCategoryMap = new Map();
+    categories.forEach(cat => validCategoryMap.set(cat._id.toString(), cat));
+
+    const validProducts = productList.filter(p =>
+      p.name &&
+      p.imageUrl &&
+      Array.isArray(p.options) && p.options.length > 0 &&
+      validCategoryMap.has(p.categoryId)
+    );
+
+    if (validProducts.length === 0) {
+      return res.status(400).json({ message: "No valid products to add. Please check your input." });
+    }
+
+    const productsToInsert = validProducts.map(p => ({
+      name: p.name,
+      imageUrl: p.imageUrl,
+      category: p.categoryId,
+      options: p.options.map(opt => ({
+        name: opt.name,
+        price: Number(opt.price)
+      }))
+    }));
+
+    const insertedProducts = await Product.insertMany(productsToInsert, { ordered: false });
+
+    res.status(201).json({
+      message: `${insertedProducts.length} products added successfully.`,
+      insertedCount: insertedProducts.length,
+      failedCount: productList.length - insertedProducts.length
+    });
+  } catch (error) {
+    console.error('Bulk add error:', error);
+    res.status(500).json({ message: 'Failed to add products in bulk.', error: error.message });
+  }
+});
+
 
 // ✅ Update existing product
 router.patch('/edit-product/:id', hasAccess("canManageProducts"), async (req, res) => {
@@ -147,7 +196,7 @@ router.patch('/edit-product/:id', hasAccess("canManageProducts"), async (req, re
     await product.save();
     const updatedProduct = await product.populate('category');
 
-    res.json({ product: updatedProduct });
+    res.json({message:"Product updated successfully", product: updatedProduct });
   } catch (error) {
     console.error('Error updating product:', error);
     res.status(400).json({ message: error.message });
