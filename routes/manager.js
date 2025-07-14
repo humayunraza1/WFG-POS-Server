@@ -404,11 +404,13 @@ router.get('/employees',hasAccess("isManager"), async (req, res) => {
   try {
     const access = req.user?.access;
 
-    let filter = {};
+   let filter = {
+  role: { $ne: 'company' }  // exclude 'company' role by default
+};
 
     // If the user is a manager, limit to specific visible roles
     if (!access.isAdmin) {
-      filter.role = { $in: ['cashier', 'chef', 'employee', 'cleaner', 'waiter'] };
+      filter.role = { $in: ['cashier', 'chef', 'employee', 'cleaner', 'waiter'], $ne: 'company' };
     }
 
     // If the user is admin or company, return all employees
@@ -419,80 +421,6 @@ router.get('/employees',hasAccess("isManager"), async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-
-// // Add/Update products
-
-// router.post('/add-product',hasAccess("canManageProducts"), async (req, res) => {
-//   try {
-//     const newProductId = await getNextProductId();
-//     console.log('New Product ID:', newProductId);
-//     console.log(req.body)
-//     const product = new Product({
-//       customId: newProductId,
-//       name: req.body.name,
-//       imageUrl: req.body.imageUrl
-//     });
-
-//     const savedProduct = await product.save();
-//     // Save variants
-//     const variantDocs = await Promise.all(req.body.variants.map(async (variant, index) => {
-//       return await new Variant({
-//         customId: `${newProductId}-${index + 1}`,
-//         name: variant.name,
-//         price: variant.price,
-//         imageUrl: variant.imageUrl,
-//         product: savedProduct._id
-//       }).save();
-//     }));
-
-//     res.status(201).json({ product: savedProduct, variants: variantDocs });
-//   } catch (error) {
-//     console.error('Error creating product:', error);
-//     res.status(400).json({ message: error.message });
-//   }
-// });
-
-// // Update product
-// // Update product
-// router.patch('/edit-product/:id',hasAccess("canManageProducts"), async (req, res) => {
-//   try {
-//     const product = await Product.findById(req.params.id);
-//     if (!product) {
-//       return res.status(404).json({ message: 'Product not found' });
-//     }
-
-//     // Update basic product fields
-//     if (req.body.name) product.name = req.body.name;
-//     if (req.body.imageUrl) product.imageUrl = req.body.imageUrl;
-
-//     await product.save();
-
-//     // Optional: update variants if provided
-//     if (req.body.variants && Array.isArray(req.body.variants)) {
-//       // Option 1: Delete all and re-add (simple & clean)
-//       await Variant.deleteMany({ product: product._id });
-
-//       const updatedVariants = await Promise.all(
-//         req.body.variants.map((variant, index) =>
-//           new Variant({
-//             customId: `${product.customId}-${index + 1}`,
-//             name: variant.name,
-//             price: variant.price,
-//             imageUrl: variant.imageUrl,
-//             product: product._id
-//           }).save()
-//         )
-//       );
-
-//       return res.json({ product, variants: updatedVariants });
-//     }
-
-//     res.json(product);
-//   } catch (error) {
-//     res.status(400).json({ message: error.message });
-//   }
-// });
 
 // Expenses
 
