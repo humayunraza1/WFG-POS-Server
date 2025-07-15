@@ -337,7 +337,7 @@ router.get('/create-report',hasAccess("canGenReport"), async (req, res) => {
 });
 
 // Get saved report by ID
-router.get('/get-report/:id',hasAccess("canViewReport"), async (req, res) => {
+router.get('/get-report/:id',hasAccess("canGenReport"), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -363,7 +363,7 @@ router.get('/get-report/:id',hasAccess("canViewReport"), async (req, res) => {
 });
 
 
-router.get('/',hasAccess("canViewReport"), async (req, res) => {
+router.get('/',hasAccess("canGenReport"), async (req, res) => {
   try {
     const reports = await Report.find({}, {
       _id: 1,

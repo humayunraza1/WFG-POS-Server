@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 const Register = require('../models/Register');
+const Employee = require('../models/Employees');
 const { default: mongoose } = require('mongoose');
 const authenticate = require('../middleware/authenticate');
 const hasAccess = require('../middleware/hasAccess');
@@ -10,35 +11,61 @@ const updateRegister = require('../utils/updateRegister');
 router.use(authenticate);
 
 // Get all orders
-router.get('/', async (req, res) => {
-  const cashierId = req.user?.userId;
-  try {
-    const orders = await Order.find({ cashier: cashierId })
-      .sort({ createdAt: -1 })
-      .populate({path:'items.product',select:'name'})
-      .populate({path:'items.category',select:'name'});
+router.get('/', hasAccess('isManager'), async (req, res) => {
+  const userId = req.user?.userId;
+  const { access } = req.user;
 
-    // Manually fetch register session data for each order
+  try {
+    let orders = [];
+
+    // If Admin or has access to all orders
+    if (access.isAdmin || access.canViewOrders) {
+      orders = await Order.find()
+        .sort({ createdAt: -1 })
+        .populate({ path: 'items.product', select: 'name' })
+        .populate({ path: 'items.category', select: 'name' });
+    } else {
+      // Get all registers managed by the current user
+      const employee = await Employee.findOne({ accountRef: userId });
+
+      if (!employee) {
+        return res.status(403).json({ message: 'Employee not found' });
+      }
+
+      const registers = await Register.find({ managerRef: employee._id });
+
+      const sessionIds = registers.map(r => r.sessionId);
+
+      // Get orders that belong to those sessions
+      orders = await Order.find({ registerSession: { $in: sessionIds } })
+        .sort({ createdAt: -1 })
+        .populate({ path: 'items.product', select: 'name' })
+        .populate({ path: 'items.category', select: 'name' });
+    }
+
+    // Attach register session manager info
     const ordersWithSessions = await Promise.all(
       orders.map(async (order) => {
         const orderObj = order.toObject();
+
         if (orderObj.registerSession) {
           try {
-            const session = await Register.findOne({sessionId: orderObj.registerSession});
-            if (session && session.manager) {
-              orderObj.registerSession = { manager: session.manager };
+            const session = await Register.findOne({ sessionId: orderObj.registerSession });
+            if (session && session.managerRef) {
+              orderObj.registerSession = { manager: session.managerRef };
             }
           } catch (err) {
             console.log(`Could not find session ${orderObj.registerSession}:`, err.message);
-            // Keep the original string if session not found
           }
         }
+
         return orderObj;
       })
     );
 
     res.json(ordersWithSessions);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 });

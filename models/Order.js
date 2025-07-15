@@ -10,6 +10,11 @@ const orderSchema = new mongoose.Schema({
     ref: 'Account',
     required: false
   },
+  branchCode: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    default:null
+  },
   items: [{
     category: {
       type: mongoose.Schema.Types.ObjectId,

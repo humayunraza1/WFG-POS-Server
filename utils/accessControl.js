@@ -26,7 +26,6 @@ const managerAccess = {
     canAddEmployee: true ,
     canDeleteEmployees: true ,
     canEditRoles: true,
-    canGenReport:true,
     canManageExpenses:true,
 }
 

@@ -80,7 +80,7 @@ router.post('/add-account', hasAccess("canAssignAccount"), async (req, res) => {
 });
 
 // Edit Account
-router.put('/edit-account/:accountId', hasAccess(["canEditRoles", "canAssignAccount"]), async (req, res) => {
+router.put('/edit-account/:accountId', hasAccess("canAssignAccount"), async (req, res) => {
   try {
     const { accountId } = req.params;
     const { username, password, access = {} } = req.body;
@@ -436,7 +436,12 @@ router.get('/expenses',hasAccess("canManageExpenses"), async (req, res) => {
 
 
 // Add new expense
-router.post('/add-expense',hasAccess("canManageExpense"), async (req, res) => {
+router.post('/add-expense',hasAccess("canManageExpenses"), async (req, res) => {
+
+  if(!req.body.registerSession){
+    return res.status(400).json("Please select an active register session")
+  }
+
   const expense = new Expense({
     registerSession: req.body.registerSession,
     name: req.body.name,
@@ -453,6 +458,7 @@ router.post('/add-expense',hasAccess("canManageExpense"), async (req, res) => {
   await updateRegister(req.body.registerSession);
     res.status(201).json(newExpense);
   } catch (error) {
+    console.log(error)
     res.status(400).json({ message: error.message });
   }
 });

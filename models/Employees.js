@@ -6,6 +6,11 @@ const employeeSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+    branchCode: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      default:null
+    },
   email: {
     type: String,
     trim: true

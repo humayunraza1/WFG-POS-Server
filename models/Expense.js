@@ -5,6 +5,11 @@ const expenseSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+    branchCode: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      default:null
+    },
   name: {
     type: String,
     required: true,
