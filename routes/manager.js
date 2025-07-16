@@ -144,6 +144,30 @@ router.put('/edit-account/:accountId', hasAccess("canAssignAccount"), async (req
   }
 });
 
+
+router.get('/accounts', hasAccess('canAssignAccount'), async (req, res) => {
+  try {
+    const { access } = req.user;
+    
+    // Get all accounts excluding password field
+    let accounts = await Account.find({}).select('-password');
+    
+    // Apply filtering based on user access level
+    if (access.isAdmin) {
+      // Admin can see all accounts except other admins
+      accounts = accounts.filter(account => !account.access.isAdmin);
+    } else if (access.canAssignAccount) {
+      // Non-admin with canAssignAccount can see accounts except admins and managers
+      accounts = accounts.filter(account => !account.access.isAdmin && !account.access.isManager);
+    }
+    
+    res.json(accounts);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+    console.log(err);
+  }
+});
+
 router.get('/account/:accountId', hasAccess("canAssignAccount"), async (req, res) => {
   try {
     const { accountId } = req.params;
