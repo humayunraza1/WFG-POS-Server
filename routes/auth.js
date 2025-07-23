@@ -332,21 +332,20 @@ router.get('/me', async (req, res) => {
 router.post('/logout', authenticate, async (req, res) => {
   try {
     const { refreshToken } = req.cookies;
-    
+
     if (refreshToken) {
-      // Remove refresh token from database
-      const account = await Account.findById(req.user.userId);
-      if (account) {
-        await account.removeRefreshToken(refreshToken);
-      }
+      // Remove the matching refresh token document
+      await Login.findOneAndDelete({
+        accountRef: req.user.userId,
+        refreshToken: refreshToken,
+      });
     }
-    
+
     // Clear cookies
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
-    
+
     res.json({ message: 'Logout successful' });
-    
   } catch (error) {
     console.error('Logout error:', error);
     res.status(500).json({ message: 'Server error during logout' });

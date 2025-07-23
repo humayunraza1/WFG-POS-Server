@@ -10,6 +10,10 @@ const accountSchema = new mongoose.Schema({
     minlength: 3,
     maxlength: 50
   },
+  isActive:{
+    type: Boolean,
+    default:true
+  },
   password: {
     type: String,
     required: true

@@ -189,10 +189,12 @@ router.get('/account/:accountId', hasAccess("canAssignAccount"), async (req, res
 router.post('/add-employee', hasAccess("canAddEmployee"), async (req, res) => {
   try {
     const { name, email, salary,number, role, salaryDate} = req.body;
-
+    const {userId} = req.user;
+    const manager = await Employees.findOne({accountRef:userId})
     const addEmployee = new Employee({
       name,
       email,
+      branchCode:manager.branchCode || null,
       salary,
       phone:number,
       salaryCycleStartDay:salaryDate,
@@ -427,24 +429,62 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
 router.get('/employees',hasAccess("isManager"), async (req, res) => {
   try {
     const access = req.user?.access;
-
+    const {userId} = req.user;
    let filter = {
-  role: { $ne: 'company' }  // exclude 'company' role by default
+  role: { $ne: 'company' } // exclude 'company' role by default
 };
 
     // If the user is a manager, limit to specific visible roles
     if (!access.isAdmin) {
+      const manager = await Employees.findOne({accountRef:userId})
+      console.log('branch code: ',manager.branchCode)
+      filter.branchCode = manager.branchCode;
       filter.role = { $in: ['cashier', 'chef', 'employee', 'cleaner', 'waiter'], $ne: 'company' };
     }
 
     // If the user is admin or company, return all employees
-    const employees = await Employee.find(filter).select('_id name email role phone salary accountRef').populate('accountRef', 'username');
+    const employees = await Employee.find(filter).select('_id name email role phone salary accountRef branchCode').populate('accountRef', 'username');
 
     res.json(employees);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
+
+router.put('/update-employee',hasAccess('isManager'),async (req,res)=>{
+  try{
+    const {id,employeeData} = req.body;
+    console.log("Employee Data: ",employeeData)
+    const {access} = req.user;
+    const employee = await Employee.findById(id)
+    if(!employee){
+      throw new Error("No employee found");
+    }
+
+    if(employeeData.branchCode != employee.branchCode){
+      if(!access.isAdmin){
+        throw new Error("Insufficient Permission to update Branch code. Contact Support")
+      }else{
+        employee.branchCode = employeeData.branchCode
+      }
+    }    
+    if(employeeData.salary != employee.salary){
+      employee.salary = employeeData.salary
+    }
+
+    if(employeeData.name != employee.name){
+      employee.name = employeeData.name
+    }
+    if(employeeData.email != employee.email){
+      employee.email = employeeData.email
+    }
+    await employee.save()
+    res.status(200).json({message:"Employee details updated",employee})
+  }catch(err){
+    console.log(err)
+    res.json(err)
+  }
+})
 
 // Expenses
 

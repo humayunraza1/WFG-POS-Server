@@ -7,8 +7,7 @@ const employeeSchema = new mongoose.Schema({
     trim: true
   },
     branchCode: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Branch',
+      type: String,
       default:null
     },
   email: {
