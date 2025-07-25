@@ -21,52 +21,120 @@ const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
 const REFRESH_TOKEN_EXPIRY = '2d'; // 7 days
 
 
-router.post('/add-account', hasAccess("canAssignAccount"), async (req, res) => {
+router.get('/',hasAccess('isAdmin'), async(req,res)=>{
+  try{
+    const managers = await Employees.find({role:"manager"}).select('name')
+    res.status(200).send(managers)
+  }catch(err){
+    console.log(err)
+    res.status(500).send(err)
+  }
+})
+
+router.get('/employees-without-accounts', hasAccess('isManager'), async (req, res) => {
   try {
-    const { employeeId, username, password, access = {} } = req.body;
+    const { access, userId } = req.user;
+    
+    // Get all employee IDs that are already referenced in accounts
+    const accountsWithEmployees = await Account.find({ 
+      employeeRef: { $exists: true, $ne: null } 
+    }).select('employeeRef');
+    
+    const assignedEmployeeIds = accountsWithEmployees.map(account => account.employeeRef);
+    
+    let availableEmployees = [];
+    
+    if (access.isAdmin) {
+      // Admin can see all employees without accounts
+      availableEmployees = await Employees.find({
+        _id: { $nin: assignedEmployeeIds },
+        role: { $ne: 'company' }
+      }).select('_id name email role branchCode');
+    } else {
+      // Manager can only see employees from their branch without accounts
+      const currentUser = await Account.findById(userId);
+      availableEmployees = await Employees.find({
+        _id: { $nin: assignedEmployeeIds },
+        branchCode: currentUser.branchCode,
+        role: { $nin: ['company', 'manager'] }
+      }).select('_id name email role');
+    }
+    
+    res.json(availableEmployees);
+  } catch (err) {
+    console.error('Error fetching employees without accounts:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+router.post('/add-admin',async(req,res)=>{
+  try{
+    const {username,password,access={}} = req.body;
+        const newAccount = new Account({ username, password, access });
+    await newAccount.save();
+      res.status(201).json({
+      message: 'Account created successfully',
+      user: { id: newAccount._id, username: newAccount.username }
+    });
+  }catch(err){
+    res.status(500).json({ message: 'Server error during account creation' });
+  }
+
+})
+
+router.post('/add-account', hasAccess("isManager"), async (req, res) => {
+  try {
+    const { username, password, access = {},branchCode } = req.body;
+    console.log(username + " " + password)
     const currAccess = req.user.access;
     console.log("Current User Access:", currAccess);
-        const employee = await Employee.findById(employeeId);
-        if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-    if (employee.accountRef) {
-      return res.status(400).json({ message: 'This employee already has an account'
-      });
-    }
+
     if (!username || !password) {
       return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    // Filter access flags based on current user's privileges
+    // Check if isCashier is true and other access flags are also true
+    if (access.isCashier === true) {
+      const otherAccessFlags = Object.keys(access).filter(key => 
+        key !== 'isCashier' && access[key] === true
+      );
+      
+      if (otherAccessFlags.length > 0) {
+        return res.status(400).json({
+          message: 'Cashier role cannot have other access permissions',
+          conflictingPermissions: otherAccessFlags
+        });
+      }
+    }
+
     const currentAccess = req.user.access || {};
-    const adminOnlyFlags = ['isAdmin', 'isManager', 'canEditRoles', 'canDeleteEmployees','canAssignAccount', 'canAddEmployee', 'canViewReports'];
+    const adminOnlyFlags = ['isAdmin', 'isManager', 'canGenReport'];
     const deniedFlags = [];
     const filteredAccess = {};
 
-        for (const key in access) {
-          if (adminOnlyFlags.includes(key)) {
-            if (currentAccess.isAdmin) {
-              filteredAccess[key] = access[key];
-            } else {
-              if (access[key]) deniedFlags.push(key); // Only flag if trying to enable it
-            }
-          } else {
-            filteredAccess[key] = access[key];
-          }
+    for (const key in access) {
+      if (adminOnlyFlags.includes(key)) {
+        if (currentAccess.isAdmin) {
+          filteredAccess[key] = access[key];
+        } else {
+          if (access[key]) deniedFlags.push(key);
         }
-      
-  if (deniedFlags.length > 0) {
-  return res.status(403).json({
-    message: 'You are not allowed to assign the following permissions:',
-    denied: deniedFlags
-  });
-}
+      } else {
+        filteredAccess[key] = access[key];
+      }
+    }
 
-    // Create new account and employee record
-    const newAccount = new Account({ username, password, access: filteredAccess });
+    if (deniedFlags.length > 0) {
+      return res.status(403).json({
+        message: 'You are not allowed to assign the following permissions:',
+        denied: deniedFlags
+      });
+    }
+
+    // Create new account
+    const newAccount = new Account({ username, password, access: filteredAccess,isActive:false,branchCode });
     await newAccount.save();
-    await employee.updateOne({ accountRef: newAccount._id });
 
     res.status(201).json({
       message: 'Account created successfully',
@@ -79,11 +147,35 @@ router.post('/add-account', hasAccess("canAssignAccount"), async (req, res) => {
   }
 });
 
+
+router.put('/assign-account',hasAccess('isManager'),async(req,res)=>{
+  try{
+    const {accId,empId} = req.body;
+    const acc = await Account.findById(accId)
+    const emp = await Employees.findById(empId)
+    if (acc.employeeRef){
+      throw new Error("Kindly remove existing employee to assign new one.")
+    }
+    if(!emp){
+      throw new Error("Employee not found, please retry.")
+    }
+
+    acc.employeeRef = empId
+    await acc.save()
+    res.status(200).send(acc)
+  }catch(err){
+    console.log(err)
+    return res.status(500).send(err)
+  }
+})
+
+
 // Edit Account
-router.put('/edit-account/:accountId', hasAccess("canAssignAccount"), async (req, res) => {
+// Edit Account
+router.put('/edit-account/:accountId', hasAccess("isManager"), async (req, res) => {
   try {
     const { accountId } = req.params;
-    const { username, password, access = {} } = req.body;
+    const { username, password, access = {}, branchCode } = req.body;
     const currentAccess = req.user.access || {};
 
     const account = await Account.findById(accountId);
@@ -100,15 +192,30 @@ router.put('/edit-account/:accountId', hasAccess("canAssignAccount"), async (req
       account.password = password; // Will be hashed by .pre('save') hook
     }
 
+    if(branchCode){
+      account.branchCode = branchCode
+    }
+
     // Handle access updates
     if (Object.keys(access).length > 0) {
-      if (!currentAccess.canEditRoles) {
-        return res.status(403).json({ message: 'You are not allowed to edit access roles' });
+
+      // Check if isCashier is true and other access flags are also true
+      if (access.isCashier === true) {
+        const otherAccessFlags = Object.keys(access).filter(key => 
+          key !== 'isCashier' && access[key] === true
+        );
+        
+        if (otherAccessFlags.length > 0) {
+          return res.status(400).json({
+            message: 'Cashier role cannot have other access permissions',
+            conflictingPermissions: otherAccessFlags
+          });
+        }
       }
 
       const adminOnlyFlags = [
-        'isAdmin', 'isManager', 'canEditRoles', 'canDeleteEmployees', 
-        'canAssignAccount', 'canAddEmployee', 'canViewReports'
+        'isAdmin', 'isManager', 'canViewAllRegisters',
+         'canGenReport'
       ];
       const deniedFlags = [];
       const updatedAccess = {};
@@ -118,7 +225,7 @@ router.put('/edit-account/:accountId', hasAccess("canAssignAccount"), async (req
           if (currentAccess.isAdmin) {
             updatedAccess[key] = access[key];
           } else if (access[key]) {
-            deniedFlags.push(key); // Flag only if trying to enable a restricted flag
+            deniedFlags.push(key);
           }
         } else {
           updatedAccess[key] = access[key];
@@ -135,7 +242,7 @@ router.put('/edit-account/:accountId', hasAccess("canAssignAccount"), async (req
       account.access = updatedAccess;
     }
 
-    await account.save(); // This triggers password hashing if modified
+    await account.save();
     res.json({ message: 'Account updated successfully' });
 
   } catch (error) {
@@ -145,22 +252,49 @@ router.put('/edit-account/:accountId', hasAccess("canAssignAccount"), async (req
 });
 
 
-router.get('/accounts', hasAccess('canAssignAccount'), async (req, res) => {
+router.put('/account-status',hasAccess('isManager'),async(req,res)=>{
+  try{
+    const {accId,status} = req.body
+    const {access} = req.user;
+    const account = await Account.findById(accId);
+
+    if (account.access.isAdmin){
+      throw new Error("Insufficient permissions, contact support")
+    }
+    if(account.access.isManager && !access.isAdmin){
+      throw new Error("Insufficient permissions, contact support")
+    }
+
+
+    if(!account.employeeRef && status == true){
+      return res.status(402).json({message: "Assign an employee first"})
+    }else{
+      account.isActive = status
+    }
+    await account.save()
+    return res.status(200).send(account)
+  }catch(err){
+    console.log(err)
+    return res.status(402).send(err)
+  }
+})
+
+
+router.get('/accounts', hasAccess('isManager'), async (req, res) => {
   try {
-    const { access } = req.user;
+    const { access,userId } = req.user;
     
     // Get all accounts excluding password field
-    let accounts = await Account.find({}).select('-password');
-    
-    // Apply filtering based on user access level
-    if (access.isAdmin) {
-      // Admin can see all accounts except other admins
+    const user = await Account.findById(userId)
+    let accounts = []
+    if(access.isAdmin){
+      accounts = await Account.find({}).select('_id username access branchCode createdAt isActive employeeRef').populate('employeeRef','_id name');
       accounts = accounts.filter(account => !account.access.isAdmin);
-    } else if (access.canAssignAccount) {
-      // Non-admin with canAssignAccount can see accounts except admins and managers
+    }else{
+      accounts = await Account.find({branchCode:user.branchCode}).select('_id username access createdAt isActive employeeRef').populate('employeeRef','_id name')
       accounts = accounts.filter(account => !account.access.isAdmin && !account.access.isManager);
     }
-    
+        
     res.json(accounts);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
@@ -168,11 +302,11 @@ router.get('/accounts', hasAccess('canAssignAccount'), async (req, res) => {
   }
 });
 
-router.get('/account/:accountId', hasAccess("canAssignAccount"), async (req, res) => {
+router.get('/account/:accountId', hasAccess("isManager"), async (req, res) => {
   try {
     const { accountId } = req.params;
 
-    const account = await Account.findById(accountId);
+    const account = await Account.findById(accountId).select('-password');
     if (!account) {
       return res.status(404).json({ message: 'Account not found' });
     }
@@ -186,20 +320,26 @@ router.get('/account/:accountId', hasAccess("canAssignAccount"), async (req, res
 });
 
 
-router.post('/add-employee', hasAccess("canAddEmployee"), async (req, res) => {
+router.post('/add-employee', hasAccess("isManager"), async (req, res) => {
   try {
-    const { name, email, salary,number, role, salaryDate} = req.body;
-    const {userId} = req.user;
-    const manager = await Employees.findOne({accountRef:userId})
+    const { name, email, salary,number,branchCode = null, role, salaryDate} = req.body;
+    const {userId,access} = req.user;
+    const manager = await Account.findById(userId).populate('employeeRef')
+    let code=''
+    if (access.isAdmin){
+      code = branchCode
+    }else{
+      code = manager.employeeRef.branchCode
+    }
+
     const addEmployee = new Employee({
       name,
       email,
-      branchCode:manager.branchCode || null,
+      branchCode: code,
       salary,
       phone:number,
       salaryCycleStartDay:salaryDate,
-      role,
-      accountRef: null,
+      role
     });
     await addEmployee.save();
 
@@ -257,7 +397,7 @@ router.get('/daily-count',async (req, res) => {
 });
 
 // Delete order
-router.delete('/delete-order/:id',hasAccess("canDeleteOrders"), async (req, res) => {
+router.delete('/delete-order/:id',hasAccess("isManager"), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
@@ -278,14 +418,15 @@ router.delete('/delete-order/:id',hasAccess("canDeleteOrders"), async (req, res)
 });
 
 
+
 router.get('/registers/active',hasAccess("isManager"), async (req, res) => {
   try {
     const managerAccId = req.user.userId;
     const access = req.user.access;
     if (!access.isAdmin && !access.canViewAllRegisters){
 
-      const managerId = await Employees.find({ accountRef: managerAccId }).select('_id');
-      const registers = await Register.find({ isOpen: true, managerRef: managerId })
+      const managerId = await Account.find(managerAccId).populate('employeeRef','_id name');
+      const registers = await Register.find({ isOpen: true, managerRef: managerId.employeeRef._id })
       .select('sessionId openedAt cashier')
       .populate('cashier', 'username');
       
@@ -307,15 +448,14 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
   try {
     const { sessionId } = req.query;
     const manager = req.user.userId;
-    const account = await Account.findById(manager);
-    const managerEmp = await Employees.findOne({ accountRef: manager }).select('_id');
+    const account = await Account.findById(manager).populate('employeeRef','_id name');
 
     let registers = [];
 
     if (account.access.isManager && !account.access.isAdmin && !account.access.canViewAllRegisters) {
       if (!sessionId || sessionId === 'ALL') {
         // All open registers for the logged-in manager
-        registers = await Register.find({ isOpen: true, managerRef: managerEmp._id })
+        registers = await Register.find({ isOpen: true, managerRef: account.employeeRef._id })
           .populate({
             path: 'orders',
             populate: [
@@ -330,7 +470,7 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
         registers = await Register.find({
           sessionId,
           isOpen: true,
-          managerRef: managerEmp._id
+          managerRef: account.employeeRef._id
         })
           .populate({
             path: 'orders',
@@ -436,14 +576,14 @@ router.get('/employees',hasAccess("isManager"), async (req, res) => {
 
     // If the user is a manager, limit to specific visible roles
     if (!access.isAdmin) {
-      const manager = await Employees.findOne({accountRef:userId})
+      const manager = await Account.findById(userId)
       console.log('branch code: ',manager.branchCode)
       filter.branchCode = manager.branchCode;
       filter.role = { $in: ['cashier', 'chef', 'employee', 'cleaner', 'waiter'], $ne: 'company' };
     }
 
     // If the user is admin or company, return all employees
-    const employees = await Employee.find(filter).select('_id name email role phone salary accountRef branchCode').populate('accountRef', 'username');
+    const employees = await Employee.find(filter).select('_id name email role phone salary branchCode');
 
     res.json(employees);
   } catch (error) {
@@ -489,7 +629,7 @@ router.put('/update-employee',hasAccess('isManager'),async (req,res)=>{
 // Expenses
 
 // Get all expenses
-router.get('/expenses',hasAccess("canManageExpenses"), async (req, res) => {
+router.get('/expenses',hasAccess("isManager"), async (req, res) => {
   try {
     const expenses = await Expense.find();
     res.json(expenses);
@@ -500,7 +640,7 @@ router.get('/expenses',hasAccess("canManageExpenses"), async (req, res) => {
 
 
 // Add new expense
-router.post('/add-expense',hasAccess("canManageExpenses"), async (req, res) => {
+router.post('/add-expense',hasAccess("isManager"), async (req, res) => {
 
   if(!req.body.registerSession){
     return res.status(400).json("Please select an active register session")
@@ -528,7 +668,7 @@ router.post('/add-expense',hasAccess("canManageExpenses"), async (req, res) => {
 });
 
 // Update expense
-router.put('/update-expense/:id',hasAccess("canManageExpenses"), async (req, res) => {
+router.put('/update-expense/:id',hasAccess("isManager"), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, amount } = req.body;
@@ -559,7 +699,7 @@ router.put('/update-expense/:id',hasAccess("canManageExpenses"), async (req, res
 });
 
 // Delete expense
-router.delete('/delete-expense/:id',hasAccess("canManageExpenses"), async (req, res) => {
+router.delete('/delete-expense/:id',hasAccess("isManager"), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -593,12 +733,9 @@ router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const account = await Account.findById(userId);
-    const employee = await Employees.findOne({ accountRef: userId });
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-    const managerId = employee._id;
+    const account = await Account.findById(userId).populate('employeeRef');
+
+    const managerId = account.employeeRef._id;
 
     const { startDate, endDate } = req.query;
     
@@ -644,9 +781,9 @@ router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
 router.get('/register/sessions/:id',hasAccess("isManager"), async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.userId;
+    const {userId} = req.user;
     const access = req.user?.access;
-    const manager = await Employees.findOne({ accountRef: userId });
+    const manager = await Account.findById(userId).populate('employeeRef');
 
     const session = await Register.findById(id)
       .populate({

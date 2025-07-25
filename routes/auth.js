@@ -16,15 +16,15 @@ const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
 const REFRESH_TOKEN_EXPIRY = '2d'; // 7 days
 
 // Helper function to generate tokens
-const generateTokens = (userId,role,access) => {
+const generateTokens = (userId) => {
   const accessToken = jwt.sign(
-    { userId,role,access }, 
+    { userId }, 
     JWT_SECRET, 
     { expiresIn: ACCESS_TOKEN_EXPIRY }
   );
   
   const refreshToken = jwt.sign(
-    { userId,role,access }, 
+    { userId }, 
     REFRESH_SECRET, 
     { expiresIn: REFRESH_TOKEN_EXPIRY }
   );
@@ -33,71 +33,71 @@ const generateTokens = (userId,role,access) => {
 };
 
 // POST /create - Create new user account
-router.post('/create', async (req, res) => {
-  try {
-    const { username, password } = req.body;
+// router.post('/create', async (req, res) => {
+//   try {
+//     const { username, password } = req.body;
     
-    // Validation
-    if (!username || !password) {
-      return res.status(400).json({ 
-        message: 'Name, email, username and password are required' 
-      });
-    }
+//     // Validation
+//     if (!username || !password) {
+//       return res.status(400).json({ 
+//         message: 'Name, email, username and password are required' 
+//       });
+//     }
     
-    if (username.length < 3) {
-      return res.status(400).json({ 
-        message: 'Username must be at least 3 characters long' 
-      });
-    }
+//     if (username.length < 3) {
+//       return res.status(400).json({ 
+//         message: 'Username must be at least 3 characters long' 
+//       });
+//     }
     
     
-    // Check if username already exists
-    const existingAccount = await Account.findOne({ username });
-    if (existingAccount) {
-      return res.status(409).json({ 
-        message: 'Username already exists' 
-      });
-    }
+//     // Check if username already exists
+//     const existingAccount = await Account.findOne({ username });
+//     if (existingAccount) {
+//       return res.status(409).json({ 
+//         message: 'Username already exists' 
+//       });
+//     }
     
-    // Create new account
-    const account = new Account({ username, password });
-    await account.save();
+//     // Create new account
+//     const account = new Account({ username, password });
+//     await account.save();
     
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(account._id);
+//     // Generate tokens
+//     const { accessToken, refreshToken } = generateTokens(account._id);
     
-    // Store refresh token in database
-    account.refreshTokens.push({ token: refreshToken });
-    await account.save();
+//     // Store refresh token in database
+//     account.refreshTokens.push({ token: refreshToken });
+//     await account.save();
     
-    // Set cookies
-    res.cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
+//     // Set cookies
+//     res.cookie('accessToken', accessToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'strict',
+//       maxAge: 15 * 60 * 1000 // 15 minutes
+//     });
     
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 2 * 24 * 60 * 60 * 1000 // 7 days
-    });
+//     res.cookie('refreshToken', refreshToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'strict',
+//       maxAge: 2 * 24 * 60 * 60 * 1000 // 7 days
+//     });
     
-    res.status(201).json({ 
-      message: 'Account created successfully',
-      user: { 
-        id: account._id, 
-        username: account.username 
-      }
-    });
+//     res.status(201).json({ 
+//       message: 'Account created successfully',
+//       user: { 
+//         id: account._id, 
+//         username: account.username 
+//       }
+//     });
     
-  } catch (error) {
-    console.error('Account creation error:', error);
-    res.status(500).json({ message: 'Server error during account creation' });
-  }
-});
+//   } catch (error) {
+//     console.error('Account creation error:', error);
+//     res.status(500).json({ message: 'Server error during account creation' });
+//   }
+// });
 
 // POST /login - Login user
 router.post('/login', async (req, res) => {
@@ -130,7 +130,7 @@ router.post('/login', async (req, res) => {
     }
     
     // Generate new tokens
-    const { accessToken, refreshToken } = generateTokens(account._id,employee.role);
+    const { accessToken, refreshToken } = generateTokens(account._id);
     
     // Store refresh token in database
         await new Login({
@@ -158,7 +158,6 @@ router.post('/login', async (req, res) => {
       user: { 
         id: account._id, 
         username: account.username,
-        role: employee.role,
         access: expandAccess(account.access)
       }
     });

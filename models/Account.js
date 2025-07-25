@@ -24,19 +24,22 @@ const accountSchema = new mongoose.Schema({
     isCashier: { type: Boolean, default: false},
     canViewOrders: { type: Boolean, default: false },
     canViewAllRegisters: { type: Boolean, default: false },
-    canDeleteOrders: { type: Boolean, default: false },
-    canAssignAccount: { type: Boolean, default: false },
-    canViewEmployees: { type: Boolean, default: false },
-    canAddEmployee: { type: Boolean, default: false },
-    canDeleteEmployees: { type: Boolean, default: false },
-    canEditRoles: { type: Boolean, default: false },
-    canGenReport: { type: Boolean, default: false },
-    canManageExpenses: { type: Boolean, default: false },
-    canManageProducts: { type: Boolean, default: false },
+    canGenReport: { type: Boolean, default: false }
   },
+      branchCode: {
+      type: String,
+      default:null
+    },
+
+    employeeRef: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    default: null
+  }
 }, {
   timestamps: true
 });
+
 
 // Hash password before saving
 accountSchema.pre('save', async function(next) {

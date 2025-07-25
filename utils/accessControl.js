@@ -6,27 +6,12 @@ const allAccess = {
   isManager: true,
   isCashier: false,
     canViewOrders: true,
-    canDeleteOrders: true,
-    canAssignAccount: true,
     canViewAllRegisters: true,
-    canViewEmployees: true ,
-    canAddEmployee: true ,
-    canDeleteEmployees: true ,
-    canEditRoles: true,
     canGenReport:true,
-    canManageExpenses:true,
-    canManageProducts: true
 };
 
 const managerAccess = {
-    isCashier: false,
-    canDeleteOrders: true,
-    canAssignAccount: true ,
-    canViewEmployees: true ,
-    canAddEmployee: true ,
-    canDeleteEmployees: true ,
-    canEditRoles: true,
-    canManageExpenses:true,
+    isCashier: false
 }
 
   if (access.isAdmin) {

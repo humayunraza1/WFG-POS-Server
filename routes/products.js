@@ -42,7 +42,7 @@ router.get('/categories', async (req, res) => {
 
 // Create a new category
 // Create a new category with counter-based customId
-router.post('/add-category', hasAccess("canManageProducts"), async (req, res) => {
+router.post('/add-category', hasAccess("isManager"), async (req, res) => {
   try {
     const { name, imageUrl } = req.body;
 
@@ -76,7 +76,7 @@ router.post('/add-category', hasAccess("canManageProducts"), async (req, res) =>
 });
 
 // ✅ Create a new product
-router.post('/add-product', hasAccess("canManageProducts"), async (req, res) => {
+router.post('/add-product', hasAccess("isManager"), async (req, res) => {
   try {
     const { name, imageUrl, categoryId, options } = req.body;
 
@@ -121,7 +121,7 @@ router.get('/:categoryId', async (req, res) => {
   }
 });
 
-router.post('/bulk-add', hasAccess("canManageProducts"), async (req, res) => {
+router.post('/bulk-add', hasAccess("isManager"), async (req, res) => {
   try {
     const productList = req.body;
     console.log("bulk add: ",req.body)
@@ -172,7 +172,7 @@ router.post('/bulk-add', hasAccess("canManageProducts"), async (req, res) => {
 
 
 // ✅ Update existing product
-router.patch('/edit-product/:id', hasAccess("canManageProducts"), async (req, res) => {
+router.patch('/edit-product/:id', hasAccess("isManager"), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Product not found' });

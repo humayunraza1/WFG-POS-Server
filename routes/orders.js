@@ -26,13 +26,9 @@ router.get('/', hasAccess('isManager'), async (req, res) => {
         .populate({ path: 'items.category', select: 'name' });
     } else {
       // Get all registers managed by the current user
-      const employee = await Employee.findOne({ accountRef: userId });
+      const employee = await Account.findById(userId).populate('employeeRef');
 
-      if (!employee) {
-        return res.status(403).json({ message: 'Employee not found' });
-      }
-
-      const registers = await Register.find({ managerRef: employee._id });
+      const registers = await Register.find({ managerRef: employee.employeeRef._id });
 
       const sessionIds = registers.map(r => r.sessionId);
 

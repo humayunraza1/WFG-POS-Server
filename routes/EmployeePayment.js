@@ -119,7 +119,7 @@ router.post('/pay/:id',hasAccess("isManager"), async (req, res) => {
   const employeeId = req.params.id;
   const { amount, type, date, note, deductible } = req.body;
     const {userId} = req.user;
-    const managerAcc = await Employees.findOne({accountRef:userId});
+    const managerAcc = await Account.findById(userId).populate('employeeRef');
   if (!amount || !type) {
     return res.status(400).json({ error: 'Amount and type are required' });
   }
@@ -137,7 +137,7 @@ router.post('/pay/:id',hasAccess("isManager"), async (req, res) => {
     console.log(req.body)
     const payment = new EmployeePayment({
       employee: employeeId,
-      manager: managerAcc._id, // Assuming userId is the ID of the manager making the payment
+      manager: managerAcc.employeeRef._id, // Assuming userId is the ID of the manager making the payment
       amount,
       type,
       date: date ? new Date(date) : new Date(),

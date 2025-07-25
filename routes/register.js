@@ -6,6 +6,7 @@ const Expense = require('../models/Expense');
 const Employee = require('../models/Employees');
 const { v4: uuidv4 } = require('uuid');
 const authenticate = require('../middleware/authenticate');
+const Account = require('../models/Account');
 
 router.use(authenticate);
 
@@ -69,6 +70,7 @@ router.post('/open', async (req, res) => {
 
     // Validate manager by ID
     const manager = await Employee.findOne({ _id: managerId, role: 'manager' });
+    const managerAcc = await Account.findOne({employeeRef:managerId})
     if (!manager) {
       return res.status(400).json({ message: 'Invalid manager ID or role' });
     }
@@ -80,7 +82,7 @@ router.post('/open', async (req, res) => {
       startCash,
       openingBalance: startCash,
       manager: manager.name,
-      managerRef: manager._id,
+      managerRef: managerAcc._id,
       cashier: cashierId,
       expenses: [],
       orders: [],

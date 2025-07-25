@@ -32,7 +32,8 @@ router.post('/add-branch',hasAccess('isAdmin'),async (req,res)=>{
             address,
             phone,
             branchCode:code,
-            managers: null
+            managers: null,
+            isActive:true
         }
         const branch = new Branch(branchData);
         const res = await branch.save()
@@ -45,7 +46,7 @@ router.post('/add-branch',hasAccess('isAdmin'),async (req,res)=>{
     }
 })
 
-router.put('/update-branch',hasAccess('isAdmin'), async (req,res)=>{
+router.put('/edit',hasAccess('isAdmin'), async (req,res)=>{
     try{
         const {id,address,name,isActive,phone} = req.body
         const branch = await Branch.findById(id);
@@ -75,35 +76,38 @@ router.put('/update-branch',hasAccess('isAdmin'), async (req,res)=>{
 
 router.put('/assign-manager', hasAccess('isAdmin'), async (req, res) => {
   try {
-    const { branchId, managerId } = req.body;
-
+    const { branchId, managerIds } = req.body; // Now expects array
+    console.log('branch id:', branchId)
+    console.log('managers:', managerIds)
     const branch = await Branch.findById(branchId);
-    const manager = await Employees.findOne({accountRef:managerId}); // ✅ FIXED MODEL NAME
-
-    if (!manager) {
-      return res.status(404).json({ message: 'Manager not found' });
-    }
-
+    console.log(branch)
     if (!branch) {
       return res.status(404).json({ message: 'Branch not found' });
     }
 
-    // ✅ Assign branch code to manager
-    manager.branchCode = branch.branchCode;
-
-    // ✅ Avoid duplicates
-    if (!Array.isArray(branch.managers)) {
-      branch.managers = [];
+    // Handle multiple manager IDs
+    const managerArray = Array.isArray(managerIds) ? managerIds : [managerIds];
+    
+    for (const managerId of managerArray) {
+      const manager = await Employees.findById(managerId);
+      
+      if (manager) {
+        manager.branchCode = branch.branchCode;
+        
+        if (!Array.isArray(branch.managers)) {
+          branch.managers = [];
+        }
+        
+        if (!branch.managers.includes(manager._id)) {
+          branch.managers.push(manager._id);
+        }
+        
+        await manager.save();
+      }
     }
 
-    if (!branch.managers.includes(manager._id)) {
-      branch.managers.push(manager._id);
-    }
-
-    await manager.save();
     await branch.save();
-
-    return res.status(200).json({ message: `${manager.name} assigned to branch ${branch.name}` });
+    return res.status(200).json({ message: `Managers assigned to branch ${branch.name}` });
   } catch (err) {
     console.error('Assign manager error:', err);
     return res.status(500).json({ message: err.message });

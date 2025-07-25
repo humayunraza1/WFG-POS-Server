@@ -32,11 +32,6 @@ const employeeSchema = new mongoose.Schema({
     min: 1,
     max: 28,
     default: 1 // <-- NEW
-  },
-  accountRef: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Account',
-    default: null
   }
 }, { timestamps: true });
 
