@@ -262,14 +262,14 @@ router.get('/me', async (req, res) => {
           return res.json({ 
             user: { 
               id: account._id, 
-              username: account.username, 
-              role: employee.role,
+              username: account.username,
               access:expandAccess(account.access)
             }
           });
         }
       } catch (error) {
         // Access token is invalid/expired, try refresh token
+        console.log(error)
         console.log('Access token expired, trying refresh token');
       }
     }

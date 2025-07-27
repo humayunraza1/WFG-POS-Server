@@ -755,9 +755,9 @@ router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
         filter.openedAt.$lt = endDatePlusOne;
       }
     }
-    if (!account.access.isAdmin) {
+    if (!account.access.isAdmin || !account.access.canViewAllRegisters) {
       // If not admin, filter by manager
-      filter.managerRef = managerId;
+      filter.managerRef = userId;
     }
     const sessions = await Register.find(filter)
       .populate({
@@ -798,7 +798,7 @@ router.get('/register/sessions/:id',hasAccess("isManager"), async (req, res) => 
       if (!session) {
         return res.status(404).json({ message: 'Register session not found' });
       }
-    if (!access.isAdmin){
+    if (!access.isAdmin || !access.canViewAllRegisters){
       if(session.managerRef.toString() !== manager._id.toString()) {
         return res.status(403).json({ message: 'Access denied: You do not have permission to view this session' });
     }
