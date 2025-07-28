@@ -10,6 +10,12 @@ const orderSchema = new mongoose.Schema({
     ref: 'Account',
     required: false
   },
+  waiterRef: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    default:null,
+    required: false
+  },
   branchCode: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch',

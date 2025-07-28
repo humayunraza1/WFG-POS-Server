@@ -24,7 +24,9 @@ const accountSchema = new mongoose.Schema({
     isCashier: { type: Boolean, default: false},
     canViewOrders: { type: Boolean, default: false },
     canViewAllRegisters: { type: Boolean, default: false },
-    canGenReport: { type: Boolean, default: false }
+    canGenReport: { type: Boolean, default: false },
+    canDeleteOrder: { type: Boolean, default: false },
+    canAddExpense: { type: Boolean, default: false }
   },
       branchCode: {
       type: String,
@@ -35,6 +37,10 @@ const accountSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee',
     default: null
+  },
+    businessRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Business', required: true },
+  preferences: {
+    printReceipt: { type: Boolean, default: true }
   }
 }, {
   timestamps: true

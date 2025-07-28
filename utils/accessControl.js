@@ -8,10 +8,14 @@ const allAccess = {
     canViewOrders: true,
     canViewAllRegisters: true,
     canGenReport:true,
+    canDeleteOrder: true,
+    canAddExpense:true
 };
 
 const managerAccess = {
-    isCashier: false
+    isCashier: false,
+    canDeleteOrder: true,
+    canAddExpense:true
 }
 
   if (access.isAdmin) {

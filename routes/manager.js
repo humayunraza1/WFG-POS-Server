@@ -85,30 +85,22 @@ router.post('/add-admin',async(req,res)=>{
 
 router.post('/add-account', hasAccess("isManager"), async (req, res) => {
   try {
-    const { username, password, access = {},branchCode } = req.body;
-    console.log(username + " " + password)
-    const currAccess = req.user.access;
-    console.log("Current User Access:", currAccess);
+    const { username, password, access = {},branchCode=null } = req.body;
+    const {userId} = req.user;
+    const account = await Account.findById(userId);
+    const currentAccess = req.user.access || {};
 
     if (!username || !password) {
       return res.status(400).json({ message: 'Username and password are required' });
     }
-
-    // Check if isCashier is true and other access flags are also true
-    if (access.isCashier === true) {
-      const otherAccessFlags = Object.keys(access).filter(key => 
-        key !== 'isCashier' && access[key] === true
-      );
-      
-      if (otherAccessFlags.length > 0) {
-        return res.status(400).json({
-          message: 'Cashier role cannot have other access permissions',
-          conflictingPermissions: otherAccessFlags
-        });
-      }
+    let brC=''
+    if(!branchCode && !currentAccess.isAdmin){
+      brC = account.branchCode
+    }else{
+      brC = branchCode
     }
 
-    const currentAccess = req.user.access || {};
+    // Check if isCashier is true and other access flags are also true
     const adminOnlyFlags = ['isAdmin', 'isManager', 'canGenReport'];
     const deniedFlags = [];
     const filteredAccess = {};
@@ -133,7 +125,7 @@ router.post('/add-account', hasAccess("isManager"), async (req, res) => {
     }
 
     // Create new account
-    const newAccount = new Account({ username, password, access: filteredAccess,isActive:false,branchCode });
+    const newAccount = new Account({ username, password, businessRef: account.businessRef,access: filteredAccess,isActive:false,branchCode:brC });
     await newAccount.save();
 
     res.status(201).json({
@@ -397,7 +389,7 @@ router.get('/daily-count',async (req, res) => {
 });
 
 // Delete order
-router.delete('/delete-order/:id',hasAccess("isManager"), async (req, res) => {
+router.delete('/delete-order/:id',hasAccess("canDeleteOrder"), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
@@ -629,18 +621,28 @@ router.put('/update-employee',hasAccess('isManager'),async (req,res)=>{
 // Expenses
 
 // Get all expenses
-router.get('/expenses',hasAccess("isManager"), async (req, res) => {
+router.get('/expenses', hasAccess("isManager"), async (req, res) => {
   try {
-    const expenses = await Expense.find();
+    const { access, userId } = req.user;
+    let expenses = [];
+
+    if (!access.isAdmin) {
+      const registers = await Register.find({ managerRef: userId }).select('sessionId');
+      const sessionIds = registers.map(reg => reg.sessionId);
+
+      expenses = await Expense.find({ registerSession: { $in: sessionIds } });
+    } else {
+      expenses = await Expense.find();
+    }
+
     res.json(expenses);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-
 // Add new expense
-router.post('/add-expense',hasAccess("isManager"), async (req, res) => {
+router.post('/add-expense',hasAccess("canAddExpense"), async (req, res) => {
 
   if(!req.body.registerSession){
     return res.status(400).json("Please select an active register session")

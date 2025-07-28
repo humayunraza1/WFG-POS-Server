@@ -25,7 +25,7 @@ const employeeSchema = new mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['cashier', 'manager', 'chef', 'waiter', 'cleaner', 'company','admin']
+    enum: ['cashier', 'manager', 'chef', 'server', 'cleaner', 'company','admin']
   },
     salaryCycleStartDay: {
     type: Number,
