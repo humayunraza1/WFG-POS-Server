@@ -11,8 +11,8 @@ const app = express();
 app.use(cookieParser());
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL, // 👈 must match your frontend origin exactly
-  credentials: true,              // 👈 allow cookies / auth headers
+  origin: process.env.FRONTEND_URL,
+  credentials: true,             
 }));
 app.use(express.json());
 app.use(morgan('dev'));
@@ -25,6 +25,8 @@ mongoose.connect(process.env.MONGODB_URI)
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/settings', require('./routes/preferences'));
+app.use('/api/roles', require('./routes/roles'));
+app.use('/api/stats', require('./routes/stats'));
 app.use('/api/business', require('./routes/business'));
 app.use('/api/employee', require('./routes/EmployeePayment'));
 app.use('/api/branch', require('./routes/branch'));

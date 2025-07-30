@@ -34,7 +34,7 @@ console.log("Cycle End:", cycleEnd);
     const payments = await EmployeePayment.aggregate([
       {
         $match: {
-          employee: new mongoose.Types.ObjectId(employeeId),
+          employee: new mongoose.types.ObjectId(employeeId),
           date: { $gte: cycleStart, $lte: cycleEnd }
         }
       },

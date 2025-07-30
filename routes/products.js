@@ -13,7 +13,6 @@ router.get('/', async (req, res) => {
   try {
     const products = await Product.find().populate('category');
     res.json(products);
-    console.log(products);
    } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -23,7 +22,6 @@ router.get('/categories', async (req, res) => {
   try {
     const products = await Category.find();
     res.json(products);
-    console.log(products);
    } catch (error) {
     res.status(500).json({ message: error.message });
   }

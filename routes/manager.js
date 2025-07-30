@@ -8,6 +8,7 @@ const Register = require('../models/Register');
 const Employees = require('../models/Employees');
 const getNextProductId = require('../utils/getProdID');
 const Expense = require('../models/Expense');
+const { default: Role } = require('../models/Role');
 const updateRegister = require('../utils/updateRegister');
 const authenticate = require('../middleware/authenticate');
 const router = express.Router();
@@ -21,10 +22,15 @@ const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
 const REFRESH_TOKEN_EXPIRY = '2d'; // 7 days
 
 
-router.get('/',hasAccess('isAdmin'), async(req,res)=>{
+router.get('/', async(req,res)=>{
   try{
-    const managers = await Employees.find({role:"manager"}).select('name')
-    res.status(200).send(managers)
+    const {role} = req.query;
+    const {userId} = req.user;
+    const acc = await Account.findById(userId).select('branchCode')
+    const employees = await Employees.find({role:role,branchCode:acc.branchCode}).select('_id name')
+    console.log("role passed: ",role)
+    console.log(employees)
+    res.status(200).send(employees)
   }catch(err){
     console.log(err)
     res.status(500).send(err)
@@ -558,30 +564,36 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
 });
 
 // GET /employees
-router.get('/employees',hasAccess("isManager"), async (req, res) => {
+router.get('/employees', hasAccess('isManager'), async (req, res) => {
   try {
-    const access = req.user?.access;
-    const {userId} = req.user;
-   let filter = {
-  role: { $ne: 'company' } // exclude 'company' role by default
-};
+    const { userId, access } = req.user;
 
-    // If the user is a manager, limit to specific visible roles
+    const account = await Account.findById(userId).select('branchCode businessRef');
+    const filter = {
+      role: { $ne: 'company' } // always exclude 'company'
+    };
+
     if (!access.isAdmin) {
-      const manager = await Account.findById(userId)
-      console.log('branch code: ',manager.branchCode)
-      filter.branchCode = manager.branchCode;
-      filter.role = { $in: ['cashier', 'chef', 'employee', 'cleaner', 'waiter'], $ne: 'company' };
+      // Fetch all roles for the current business
+      const roles = await Role.find({ businessRef: account.businessRef }).select('name');
+
+      // Filter out 'manager' and 'admin'
+      const allowedRoles = roles
+        .map(role => role.name)
+        .filter(roleName => roleName !== 'manager' && roleName !== 'admin');
+
+      filter.branchCode = account.branchCode;
+      filter.role = { $in: allowedRoles, $ne: 'company' };
     }
 
-    // If the user is admin or company, return all employees
     const employees = await Employee.find(filter).select('_id name email role phone salary branchCode');
-
     res.json(employees);
   } catch (error) {
+    console.error('Error fetching employees:', error);
     res.status(500).json({ message: error.message });
   }
 });
+
 
 router.put('/update-employee',hasAccess('isManager'),async (req,res)=>{
   try{

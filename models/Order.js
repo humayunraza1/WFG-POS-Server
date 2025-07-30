@@ -10,7 +10,7 @@ const orderSchema = new mongoose.Schema({
     ref: 'Account',
     required: false
   },
-  waiterRef: {
+  serverRef: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee',
     default:null,

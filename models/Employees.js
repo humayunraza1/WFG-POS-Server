@@ -22,11 +22,10 @@ const employeeSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  role: {
-    type: String,
-    required: true,
-    enum: ['cashier', 'manager', 'chef', 'server', 'cleaner', 'company','admin']
-  },
+role: {
+  type: String,
+  required: true
+},
     salaryCycleStartDay: {
     type: Number,
     min: 1,

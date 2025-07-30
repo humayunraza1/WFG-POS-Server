@@ -10,16 +10,6 @@ const Account = require('../models/Account');
 
 router.use(authenticate);
 
-// Get available managers
-router.get('/managers', async (req, res) => {
-  try {
-    const managers = await Employee.find({ role: 'manager' }).select('_id name email');
-    res.json({ managers });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
 // Get register status and session data
 router.get('/status', async (req, res) => {
   try {
@@ -80,6 +70,7 @@ router.post('/open', async (req, res) => {
       isOpen: true,
       openedAt: new Date(),
       startCash,
+      branchCode:managerAcc.branchCode,
       openingBalance: startCash,
       manager: manager.name,
       managerRef: managerAcc._id,
@@ -124,7 +115,6 @@ router.post('/close', async (req, res) => {
     const cashOrders = register.orders.filter(order => order.paymentType === 'cash');
     const cashRecvd = cashOrders.reduce((sum, order) => sum + order.amountPaid, 0);
     const expectedCash = cashOrders.reduce((sum, order) => sum + order.finalPrice, 0);
-    console.log(cashOrders)
     // Calculate online payment totals
     const onlineOrders = register.orders.filter(order => order.paymentType === 'online');
     const onlineRecvd = onlineOrders.reduce((sum, order) => sum + order.amountPaid, 0);

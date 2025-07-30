@@ -33,7 +33,7 @@ router.put('/business', hasAccess('isAdmin'), async (req, res) => {
     if (!key) return res.status(400).json({ message: 'Preference key is required' });
 
     const businessId = await Account.findById(userId).select('businessRef').populate('businessRef','_id');
-    const business = await Business.findById(businessId)
+    const business = await Business.findById(businessId.businessRef._id)
     if (!business) return res.status(404).json({ message: 'Business not found' });
 
     if (!(key in business.preferences)) {

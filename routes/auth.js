@@ -113,7 +113,6 @@ router.post('/login', async (req, res) => {
     
     // Find account
     const account = await Account.findOne({ username });
-    const employee = await Employee.findOne({ accountRef: account._id });
     
     if (!account) {
       return res.status(401).json({ 

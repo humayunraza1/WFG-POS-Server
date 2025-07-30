@@ -6,6 +6,10 @@ const registerSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  branchCode:{
+    type: String,
+    required: true,
+  },
       cashier: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Account', // the new cashier user
