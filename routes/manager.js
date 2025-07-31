@@ -14,13 +14,6 @@ const authenticate = require('../middleware/authenticate');
 const router = express.Router();
 router.use(authenticate);
 
-// JWT Secret keys (in production, use environment variables)
-const JWT_SECRET = process.env.JWT_SECRET 
-const REFRESH_SECRET = process.env.REFRESH_SECRET
-// Token expiration times
-const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
-const REFRESH_TOKEN_EXPIRY = '2d'; // 7 days
-
 
 router.get('/', async(req,res)=>{
   try{
@@ -74,20 +67,20 @@ router.get('/employees-without-accounts', hasAccess('isManager'), async (req, re
 });
 
 
-router.post('/add-admin',async(req,res)=>{
-  try{
-    const {username,password,access={}} = req.body;
-        const newAccount = new Account({ username, password, access });
-    await newAccount.save();
-      res.status(201).json({
-      message: 'Account created successfully',
-      user: { id: newAccount._id, username: newAccount.username }
-    });
-  }catch(err){
-    res.status(500).json({ message: 'Server error during account creation' });
-  }
+// router.post('/add-admin',async(req,res)=>{
+//   try{
+//     const {username,password,access={},businessRef} = req.body;
+//         const newAccount = new Account({ username, password, access });
+//     await newAccount.save();
+//       res.status(201).json({
+//       message: 'Account created successfully',
+//       user: { id: newAccount._id, username: newAccount.username }
+//     });
+//   }catch(err){
+//     res.status(500).json({ message: 'Server error during account creation',err });
+//   }
 
-})
+// })
 
 router.post('/add-account', hasAccess("isManager"), async (req, res) => {
   try {

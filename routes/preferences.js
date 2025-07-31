@@ -21,6 +21,7 @@ router.get('/business', async (req, res) => {
 
     res.json(business.businessRef.preferences);
   } catch (err) {
+    console.log(err)
     res.status(500).json({ message: err.message });
   }
 });
@@ -63,6 +64,7 @@ router.get('/account' , async (req, res) => {
 
     res.json(account.preferences);
   } catch (err) {
+    console.log(err)
     res.status(500).json({ message: err.message });
   }
 });

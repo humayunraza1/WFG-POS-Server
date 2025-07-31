@@ -14,7 +14,7 @@ router.get('/',hasAccess('isAdmin'),async (req,res)=>{
         res.status(200).json(Branches)
     }catch(err){
         console.log(err)
-        res.json(err)
+        res.send(err)
     }
 })
 
