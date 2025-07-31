@@ -191,19 +191,6 @@ router.put('/edit-account/:accountId', hasAccess("isManager"), async (req, res) 
     if (Object.keys(access).length > 0) {
 
       // Check if isCashier is true and other access flags are also true
-      if (access.isCashier === true) {
-        const otherAccessFlags = Object.keys(access).filter(key => 
-          key !== 'isCashier' && access[key] === true
-        );
-        
-        if (otherAccessFlags.length > 0) {
-          return res.status(400).json({
-            message: 'Cashier role cannot have other access permissions',
-            conflictingPermissions: otherAccessFlags
-          });
-        }
-      }
-
       const adminOnlyFlags = [
         'isAdmin', 'isManager', 'canViewAllRegisters',
          'canGenReport'
