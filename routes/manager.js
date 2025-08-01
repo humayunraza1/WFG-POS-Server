@@ -752,7 +752,7 @@ router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
         filter.openedAt.$lt = endDatePlusOne;
       }
     }
-    if (!account.access.isAdmin || !account.access.canViewAllRegisters) {
+    if (!account.access.isAdmin && !account.access.canViewAllRegisters) {
       // If not admin, filter by manager
       filter.managerRef = userId;
     }
