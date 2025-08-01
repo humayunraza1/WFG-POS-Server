@@ -602,6 +602,9 @@ router.put('/update-employee',hasAccess('isManager'),async (req,res)=>{
     if(employeeData.email != employee.email){
       employee.email = employeeData.email
     }
+    if(employeeData.role != employee.role){
+      employee.role = employeeData.role
+    }
     await employee.save()
     res.status(200).json({message:"Employee details updated",employee})
   }catch(err){
