@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const { default: mongoose } = require('mongoose');
 const Account = require('../models/Account');
 const Employee = require('../models/Employees');
 const hasAccess = require('../middleware/hasAccess');
@@ -376,22 +377,30 @@ router.get('/daily-count',async (req, res) => {
 
 // Delete order
 router.delete('/delete-order/:id',hasAccess("canDeleteOrder"), async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const order = await Order.findById(req.params.id);
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
+    session.startTransaction();
+
     // Update register total sales with only the amount actually paid
             await Register.findOneAndUpdate(
               { isOpen: true, sessionId: order.registerSession },
-              { $pull: { orders: order._id }}
+              { $pull: { orders: order._id }},
+              {session}
             );  
-    await updateRegister(order.registerSession);
+    await updateRegister(order.registerSession,session);
 
-    await order.deleteOne();
+    await Order.findByIdAndDelete(req.params.id,{session})
+    await session.commitTransaction()
     res.json({ message: 'Order deleted' });
   } catch (error) {
+        await session.abortTransaction();
     res.status(500).json({ message: error.message });
+  }finally{
+    session.endSession()
   }
 });
 
@@ -638,10 +647,12 @@ router.get('/expenses', hasAccess("isManager"), async (req, res) => {
 
 // Add new expense
 router.post('/add-expense',hasAccess("canAddExpense"), async (req, res) => {
+    const session = await mongoose.startSession();
 
   if(!req.body.registerSession){
     return res.status(400).json("Please select an active register session")
   }
+    session.startTransaction();
 
   const expense = new Expense({
     registerSession: req.body.registerSession,
@@ -650,22 +661,30 @@ router.post('/add-expense',hasAccess("canAddExpense"), async (req, res) => {
   });
 
   try {
-    const newExpense = await expense.save();
+    const newExpense = await expense.save({session});
       // Update register total expenses
     await Register.findOneAndUpdate(
       { isOpen: true, sessionId: req.body.registerSession },
-      { $push: { expenses: newExpense._id }}
+      { $push: { expenses: newExpense._id }},
+      {session}
     );  
-  await updateRegister(req.body.registerSession);
+  await updateRegister(req.body.registerSession,session);
+    await session.commitTransaction();
+
     res.status(201).json(newExpense);
   } catch (error) {
+    await session.abortTransaction();
     console.log(error)
     res.status(400).json({ message: error.message });
+  }finally{
+    session.endSession();
   }
 });
 
 // Update expense
-router.put('/update-expense/:id',hasAccess("isManager"), async (req, res) => {
+router.put('/update-expense/:id',hasAccess("canAddExpense"), async (req, res) => {
+    const session = await mongoose.startSession();
+
   try {
     const { id } = req.params;
     const { name, amount } = req.body;
@@ -677,26 +696,34 @@ router.put('/update-expense/:id',hasAccess("isManager"), async (req, res) => {
     }
     
     const amountDifference = amount - oldExpense.amount;
+    session.startTransaction();
     
     // Update the expense
     const updatedExpense = await Expense.findByIdAndUpdate(
       id,
       { name, amount },
-      { new: true }
+      { new: true },
+      {session}
     );
     
     // Update register total expenses with the difference
-    await updateRegister(oldExpense.registerSession);
+    await updateRegister(oldExpense.registerSession,session);
+    await session.commitTransaction();
 
 
     res.json(updatedExpense);
   } catch (error) {
+    await session.abortTransaction();
+    console.log(error)
     res.status(400).json({ message: error.message });
+  }finally{
+    session.endSession();
   }
 });
 
 // Delete expense
-router.delete('/delete-expense/:id',hasAccess("isManager"), async (req, res) => {
+router.delete('/delete-expense/:id',hasAccess("canAddExpense"), async (req, res) => {
+    const session = await mongoose.startSession();
   try {
     const { id } = req.params;
     
@@ -705,18 +732,27 @@ router.delete('/delete-expense/:id',hasAccess("isManager"), async (req, res) => 
     if (!expense) {
       return res.status(404).json({ message: 'Expense not found' });
     }
+    const registerSession = expense.registerSession
+    session.startTransaction();
     await Register.findOneAndUpdate(
       { isOpen: true, sessionId: expense.registerSession },
-      { $pull: { expenses: expense._id } }
+      { $pull: { expenses: expense._id } },
+      {session}
     );
     // Delete the expense
-    await Expense.findByIdAndDelete(id);
+    await Expense.findByIdAndDelete(id,{session});
     
-  await updateRegister(req.body.registerSession);
-    
+  await updateRegister(registerSession,session);
+    await session.commitTransaction();
+
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {
+    await session.abortTransaction();
+
+    console.log(error)
     res.status(500).json({ message: error.message });
+  }finally{
+    session.endSession();
   }
 });
 

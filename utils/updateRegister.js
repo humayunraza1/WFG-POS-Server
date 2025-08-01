@@ -7,7 +7,6 @@ async function updateRegister(sessionId, session) {
     Order.find({ registerSession: sessionId }).session(session),
     Expense.find({ registerSession: sessionId }).session(session)
   ]);
-
   const cashOrders = orders.filter(o => o.paymentType === 'cash');
   const onlineOrders = orders.filter(o => o.paymentType === 'online');
 
@@ -19,7 +18,7 @@ async function updateRegister(sessionId, session) {
   const totalSales = orders.reduce((sum, o) => sum + o.finalPrice, 0);
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const register = await Register.findOne({ sessionId }).session(session);
+  const register = await Register.findOne({ sessionId });
   const expectedBalance = register.startCash + expectedCash - totalExpenses;
 
   await Register.findOneAndUpdate(
