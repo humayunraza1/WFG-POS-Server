@@ -342,8 +342,17 @@ router.post('/logout', authenticate, async (req, res) => {
     }
 
     // Clear cookies
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('accessToken', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+    });
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+    });
 
     res.json({ message: 'Logout successful' });
   } catch (error) {
