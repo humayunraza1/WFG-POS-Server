@@ -120,6 +120,8 @@ router.post('/login', async (req, res) => {
       });
     }
     
+    if(!account.isActive) return res.status(401).json({message:"Account disabled. Contact support"})
+
     // Check password
     const isPasswordValid = await account.comparePassword(password);
     if (!isPasswordValid) {
