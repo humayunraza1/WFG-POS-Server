@@ -17,8 +17,7 @@ const orderSchema = new mongoose.Schema({
     required: false
   },
   branchCode: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Branch',
+    type: String,
     default:null
   },
   items: [{

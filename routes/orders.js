@@ -7,6 +7,7 @@ const { default: mongoose } = require('mongoose');
 const authenticate = require('../middleware/authenticate');
 const hasAccess = require('../middleware/hasAccess');
 const updateRegister = require('../utils/updateRegister');
+const Account = require('../models/Account');
 
 router.use(authenticate);
 
@@ -103,42 +104,54 @@ router.get('/daily-count', async (req, res) => {
 
 // Create new order - Updated to handle both old and new data formats
 router.post('/', async (req, res) => {
-  console.log('Received order data:', req.body);
+  const session = await mongoose.startSession();
   const cashierId = req.user?.userId;
-  
+
   if (!cashierId) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
   try {
+    const acc = await Account.findById(cashierId).session(session);
 
     const orderData = {
       ...req.body,
-      cashier: cashierId
+      cashier: cashierId,
+      branchCode: acc.branchCode
     };
 
-    console.log('Transformed order data:', orderData);
+    session.startTransaction();
 
     const order = new Order(orderData);
-    const newOrder = await order.save();
-    
-    // Populate the product and variant data before sending response
-      await newOrder.populate({path:'items.product',select:'name'});
-      await newOrder.populate({path:'items.category',select:'name'});
-    
-    // Update register with new order
-    await Register.findOneAndUpdate(
-      { isOpen: true, sessionId: req.body.registerSession },
-      { $push: { orders: newOrder._id } }
-    );  
+    const newOrder = await order.save({ session });
 
-    // Update register total sales
-    await updateRegister(req.body.registerSession);
+    // Update register with new order
+    const updated = await Register.findOneAndUpdate(
+      { isOpen: true, sessionId: req.body.registerSession },
+      { $push: { orders: newOrder._id } },
+      { session }
+    );
+
+    if (!updated) {
+      throw new Error("Register not found or closed");
+    }
+
+    // Update register total sales (make sure this function uses the session internally!)
+    await updateRegister(req.body.registerSession, session);
+
+    await session.commitTransaction();
+
+    // Populate after committing (not needed in transaction)
+    await newOrder.populate({ path: 'items.product', select: 'name' });
+    await newOrder.populate({ path: 'items.category', select: 'name' });
 
     res.status(201).json(newOrder);
   } catch (error) {
+    await session.abortTransaction();
     console.error('Order creation error:', error);
     res.status(400).json({ message: error.message });
+  } finally {
+    session.endSession();
   }
 });
 
