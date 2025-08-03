@@ -106,7 +106,7 @@ router.get('/daily-count', async (req, res) => {
 router.post('/', async (req, res) => {
   const session = await mongoose.startSession();
   const cashierId = req.user?.userId;
-
+  const {orderData} = req.body;
   if (!cashierId) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
@@ -114,20 +114,18 @@ router.post('/', async (req, res) => {
   try {
     const acc = await Account.findById(cashierId).session(session);
 
-    const orderData = {
-      ...req.body,
+    const finalOrderData = {
+      ...orderData,
       cashier: cashierId,
       branchCode: acc.branchCode
     };
-
     session.startTransaction();
-
-    const order = new Order(orderData);
+    const order = new Order(finalOrderData);
     const newOrder = await order.save({ session });
 
     // Update register with new order
     const updated = await Register.findOneAndUpdate(
-      { isOpen: true, sessionId: req.body.registerSession },
+      { isOpen: true, sessionId: orderData.registerSession },
       { $push: { orders: newOrder._id } },
       { session }
     );
@@ -137,7 +135,7 @@ router.post('/', async (req, res) => {
     }
 
     // Update register total sales (make sure this function uses the session internally!)
-    await updateRegister(req.body.registerSession, session);
+    await updateRegister(orderData.registerSession, session);
 
     await session.commitTransaction();
 
@@ -285,6 +283,37 @@ router.patch('/:id/payment', async (req, res) => {
   } catch (error) {
     console.error('Payment update error:', error);
     res.status(500).json({ message: error.message });
+  }
+});
+
+
+// Delete order
+router.delete('/delete/:id',hasAccess("canDeleteOrder"), async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    session.startTransaction();
+
+    // Update register total sales with only the amount actually paid
+            await Register.findOneAndUpdate(
+              { isOpen: true, sessionId: order.registerSession },
+              { $pull: { orders: order._id }},
+              {session}
+            );  
+    await updateRegister(order.registerSession,session);
+
+    await Order.findByIdAndDelete(req.params.id,{session})
+    await session.commitTransaction()
+    res.json({ message: 'Order deleted',id:req.params.id });
+  } catch (error) {
+        await session.abortTransaction();
+        console.log(error)
+    res.status(500).json({ message: error.message});
+  }finally{
+    session.endSession()
   }
 });
 

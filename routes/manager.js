@@ -375,37 +375,6 @@ router.get('/daily-count',async (req, res) => {
   }
 });
 
-// Delete order
-router.delete('/delete-order/:id',hasAccess("canDeleteOrder"), async (req, res) => {
-  const session = await mongoose.startSession();
-  try {
-    const order = await Order.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
-    }
-    session.startTransaction();
-
-    // Update register total sales with only the amount actually paid
-            await Register.findOneAndUpdate(
-              { isOpen: true, sessionId: order.registerSession },
-              { $pull: { orders: order._id }},
-              {session}
-            );  
-    await updateRegister(order.registerSession,session);
-
-    await Order.findByIdAndDelete(req.params.id,{session})
-    await session.commitTransaction()
-    res.json({ message: 'Order deleted' });
-  } catch (error) {
-        await session.abortTransaction();
-    res.status(500).json({ message: error.message });
-  }finally{
-    session.endSession()
-  }
-});
-
-
-
 router.get('/registers/active',hasAccess("isManager"), async (req, res) => {
   try {
     const managerAccId = req.user.userId;

@@ -40,29 +40,29 @@ router.post('/open', async (req, res) => {
   try {
     const cashierId = req.user?.userId;
     if (!cashierId) {
-      return res.status(401).json({ message: 'Unauthorized: cashier ID missing' });
+      throw new Error('Unauthorized: cashier ID missing');
     }
 
     const existingRegister = await Register.findOne({ isOpen: true, cashier: cashierId });
     if (existingRegister) {
-      return res.status(400).json({ message: 'You already have an open register' });
+      throw new Error('You already have an open register' );
     }
 
     const { startCash, managerId } = req.body;
 
     if (startCash === undefined || startCash < 0) {
-      return res.status(400).json({ message: 'Starting cash amount is required and must be positive' });
+      throw new Error ('Starting cash amount is required and must be positive' );
     }
 
     if (!managerId) {
-      return res.status(400).json({ message: 'Manager ID is required' });
+       throw new Error ('Manager ID is required');
     }
 
     // Validate manager by ID
     const manager = await Employee.findOne({ _id: managerId, role: 'manager' });
     const managerAcc = await Account.findOne({employeeRef:managerId})
     if (!manager) {
-      return res.status(400).json({ message: 'Invalid manager ID or role' });
+      throw new Error("Manager Acc not found")
     }
 
     const register = new Register({
@@ -83,6 +83,7 @@ router.post('/open', async (req, res) => {
     const newRegister = await register.save();
     res.status(201).json(newRegister);
   } catch (error) {
+    console.log(error)
     res.status(500).json({ message: error.message });
   }
 });
