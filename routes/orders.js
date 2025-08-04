@@ -154,7 +154,7 @@ router.post('/', async (req, res) => {
 });
 
 // Get daily sales statistics
-router.get('/daily-sales/:sessionId', hasAccess("isCashier"), async (req, res) => {
+router.get('/daily-sales/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { userId } = req.user;
