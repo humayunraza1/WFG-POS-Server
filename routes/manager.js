@@ -233,9 +233,10 @@ router.put('/edit-account/:accountId', hasAccess("isManager"), async (req, res) 
 
 router.put('/account-status',hasAccess('isManager'),async(req,res)=>{
   try{
-    const {accId,status} = req.body
+    const {accId,newStatus} = req.body
+    console.log(accId,newStatus)
     const {access} = req.user;
-    const account = await Account.findById(accId);
+    const account = await Account.findById(accId).select('-password').populate('employeeRef')
 
     if (account.access.isAdmin){
       throw new Error("Insufficient permissions, contact support")
@@ -245,12 +246,13 @@ router.put('/account-status',hasAccess('isManager'),async(req,res)=>{
     }
 
 
-    if(!account.employeeRef && status == true){
+    if(!account.employeeRef && newStatus == true){
       return res.status(402).json({message: "Assign an employee first"})
     }else{
-      account.isActive = status
+      account.isActive = newStatus
     }
     await account.save()
+    // console.log(account)
     return res.status(200).send(account)
   }catch(err){
     console.log(err)
