@@ -1,11 +1,10 @@
-// Server/index.js
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 require('dotenv').config();
 
-const connectDB = require('./db'); // new file
+const connectDB = require('./db'); // We'll make a db.js for caching
 const authRoutes = require('./routes/auth');
 
 const app = express();
@@ -18,11 +17,8 @@ app.use(cors({
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Connect to MongoDB (connect but don't block export)
-connectDB().catch(err => {
-  // log error — Vercel will surface failed invocations
-  console.error('MongoDB connection error:', err);
-});
+// Connect to MongoDB (cached connection)
+connectDB().catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -40,5 +36,4 @@ app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/register', require('./routes/register'));
 app.use('/api/reports', require('./routes/reports'));
 
-// Export app (helpful for tests) and handler for serverless
-module.exports = app;
+module.exports = app; // Export app instead of listening
