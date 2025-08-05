@@ -32,6 +32,15 @@ const generateTokens = (userId) => {
   return { accessToken, refreshToken };
 };
 
+const isProd = process.env.NODE_ENV === 'production';
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: isProd,          // true in production
+  sameSite: 'none',        // use 'none' for cross-site cookies
+  path: '/',               // ensure accessible across app
+};
+
+
 // POST /create - Create new user account
 // router.post('/create', async (req, res) => {
 //   try {
@@ -141,16 +150,12 @@ router.post('/login', async (req, res) => {
     
     // Set cookies
     res.cookie('accessToken', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+...COOKIE_OPTIONS,
       maxAge: 15 * 60 * 1000 // 15 minutes
     });
     
     res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+...COOKIE_OPTIONS,
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
     
@@ -297,9 +302,7 @@ router.get('/me', async (req, res) => {
         
         // Set new access token cookie
         res.cookie('accessToken', newAccessToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+...COOKIE_OPTIONS,
           maxAge: 15 * 60 * 1000 // 15 minutes
         });
         
