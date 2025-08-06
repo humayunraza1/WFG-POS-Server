@@ -18,29 +18,64 @@ router.use(authenticate)
  */
 router.get('/', async (req, res) => {
   try {
-    const {userId,access} = req.user;
-    const acc = await Account.findById(userId).select('_id branchCode')
-    const { period = 'daily', startDate, endDate, isOpen=false } = req.query;
-  console.log(isOpen)
-    const options = {};
-    if (startDate) options.startDate = new Date(startDate);
-    if (endDate) options.endDate = new Date(endDate);
-    if(!access.isAdmin){
-      options.branchCode = acc.branchCode;
+    const { userId } = req.user; // uses userId from auth middleware
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
-    if(isOpen) options.isOpen = isOpen
-    const stats = await employeeStats.getEmployeeDeliveryStats(period, options);
-    
-    res.json({
-      success: true,
-      data: stats
-    });
-    
+
+    // find active register/session for this cashier
+    const activeRegister = await Register.findOne({ cashier: userId, isOpen: true }).select('sessionId');
+    if (!activeRegister) {
+      return res.json({ success: true, data: [], message: 'No active register session found for this user' });
+    }
+
+    const sessionId = activeRegister.sessionId;
+
+    // fetch all orders for this session and populate serverRef name only
+    const orders = await Order.find({ registerSession: sessionId })
+      .populate({ path: 'serverRef', select: 'name' })
+      .lean();
+
+    // group by serverRef (serverRef may be null)
+    const groups = new Map(); // key = serverId string or 'unassigned'
+
+    for (const o of orders) {
+      const serverId = o.serverRef?._id?.toString() ?? 'unassigned';
+      const serverName = o.serverRef?.name ?? 'Unassigned';
+
+      if (!groups.has(serverId)) {
+        groups.set(serverId, {
+          serverId: serverId === 'unassigned' ? null : serverId,
+          serverName,
+          orders: [],
+          orderCount: 0,
+          totalValue: 0
+        });
+      }
+
+      const bucket = groups.get(serverId);
+
+      // push minimal order info as requested
+      bucket.orders.push({
+        id: o._id,
+        dateOrdered: o.dateOrdered,
+        finalPrice: o.finalPrice
+      });
+
+      bucket.orderCount += 1;
+      bucket.totalValue += (typeof o.finalPrice === 'number' ? o.finalPrice : 0);
+    }
+
+    // convert map -> array
+    const result = Array.from(groups.values());
+
+    // Optional: sort by serverName (or totalValue) if you want
+    // result.sort((a,b) => a.serverName.localeCompare(b.serverName));
+
+    return res.json({ success: true, data: result });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    console.error('by-server route error:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 
