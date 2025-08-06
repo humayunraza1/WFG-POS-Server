@@ -35,9 +35,9 @@ const generateTokens = (userId) => {
 const isProd = process.env.NODE_ENV === 'production';
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: isProd,          // true in production
-  sameSite: 'none',        // use 'none' for cross-site cookies
-  path: '/',               // ensure accessible across app
+  secure: isProd,                      // only secure in production
+  sameSite: isProd ? 'none' : 'lax',   // lax works locally without HTTPS
+  path: '/',
 };
 
 
