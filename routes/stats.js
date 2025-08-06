@@ -3,6 +3,8 @@ const router = express.Router();
 const Account = require('../models/Account');
 const EmployeeStatsService = require('../services/EmployeeStatsService'); // Adjust path
 const authenticate = require('../middleware/authenticate');
+const Register = require('../models/Register');
+const Order = require('../models/Order');
 
 const employeeStats = new EmployeeStatsService();
 
