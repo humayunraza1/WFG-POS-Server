@@ -12,8 +12,8 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET 
 const REFRESH_SECRET = process.env.REFRESH_SECRET
 // Token expiration times
-const ACCESS_TOKEN_EXPIRY = '1d'; // 1d minutes
-const REFRESH_TOKEN_EXPIRY = '2d'; // 2 days
+const ACCESS_TOKEN_EXPIRY = '5m'; // 1d minutes
+const REFRESH_TOKEN_EXPIRY = '7d'; // 2 days
 
 // Helper function to generate tokens
 const generateTokens = (userId) => {
@@ -40,295 +40,98 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
-
-// POST /create - Create new user account
-// router.post('/create', async (req, res) => {
-//   try {
-//     const { username, password } = req.body;
-    
-//     // Validation
-//     if (!username || !password) {
-//       return res.status(400).json({ 
-//         message: 'Name, email, username and password are required' 
-//       });
-//     }
-    
-//     if (username.length < 3) {
-//       return res.status(400).json({ 
-//         message: 'Username must be at least 3 characters long' 
-//       });
-//     }
-    
-    
-//     // Check if username already exists
-//     const existingAccount = await Account.findOne({ username });
-//     if (existingAccount) {
-//       return res.status(409).json({ 
-//         message: 'Username already exists' 
-//       });
-//     }
-    
-//     // Create new account
-//     const account = new Account({ username, password });
-//     await account.save();
-    
-//     // Generate tokens
-//     const { accessToken, refreshToken } = generateTokens(account._id);
-    
-//     // Store refresh token in database
-//     account.refreshTokens.push({ token: refreshToken });
-//     await account.save();
-    
-//     // Set cookies
-//     res.cookie('accessToken', accessToken, {
-//       httpOnly: true,
-//       secure: process.env.NODE_ENV === 'production',
-//       sameSite: 'strict',
-//       maxAge: 15 * 60 * 1000 // 15 minutes
-//     });
-    
-//     res.cookie('refreshToken', refreshToken, {
-//       httpOnly: true,
-//       secure: process.env.NODE_ENV === 'production',
-//       sameSite: 'strict',
-//       maxAge: 2 * 24 * 60 * 60 * 1000 // 7 days
-//     });
-    
-//     res.status(201).json({ 
-//       message: 'Account created successfully',
-//       user: { 
-//         id: account._id, 
-//         username: account.username 
-//       }
-//     });
-    
-//   } catch (error) {
-//     console.error('Account creation error:', error);
-//     res.status(500).json({ message: 'Server error during account creation' });
-//   }
-// });
-
-// POST /login - Login user
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    // Validation
-    if (!username || !password) {
-      return res.status(400).json({ 
-        message: 'Username and password are required' 
-      });
-    }
-    
-    // Find account
-    const account = await Account.findOne({ username });
-    
-    if (!account) {
-      return res.status(401).json({ 
-        message: 'Invalid username or password' 
-      });
-    }
-    
-    if(!account.isActive) return res.status(401).json({message:"Account disabled. Contact support"})
 
-    // Check password
-    const isPasswordValid = await account.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ 
-        message: 'Invalid username or password' 
-      });
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
     }
-    
-    // Generate new tokens
+
+    const account = await Account.findOne({ username });
+    if (!account || !(await account.comparePassword(password))) {
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    if (!account.isActive) {
+      return res.status(401).json({ message: 'Account disabled. Contact support' });
+    }
+
     const { accessToken, refreshToken } = generateTokens(account._id);
-    
-    // Store refresh token in database
-        await new Login({
-      accountRef: account._id,
-      refreshToken
-    }).save();
-    
-    // Set cookies
-    res.cookie('accessToken', accessToken, {
-...COOKIE_OPTIONS,
-      maxAge: 15 * 60 * 1000 // 15 minutes
-    });
-    
+
+    await Login.create({ accountRef: account._id, refreshToken });
+
+    // Set refreshToken as HttpOnly cookie
     res.cookie('refreshToken', refreshToken, {
-...COOKIE_OPTIONS,
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
-    
-    res.json({ 
+
+    res.json({
       message: 'Login successful',
-      user: { 
-        id: account._id, 
+      accessToken,
+      user: {
+        id: account._id,
         username: account.username,
-        access: expandAccess(account.access)
-      }
+        access: expandAccess(account.access),
+      },
     });
-    
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ message: 'Server error during login' });
   }
 });
-// router.post('/manager/login', async (req, res) => {
-//   try {
-//     const { username, password } = req.body;
-    
-//     // Validation
-//     if (!username || !password) {
-//       return res.status(400).json({ 
-//         message: 'Username and password are required' 
-//       });
-//     }
-    
-//     // Find account
-//     const account = await Account.findOne({ username });
-//     const employee = await Employee.findOne({ accountRef: account._id });
-//     if (employee && (employee.role !== 'admin' && employee.role !== 'manager')) {
-//       return res.status(403).json({
-//         message: 'Access denied: Only cashier can login'
-//       });
-//     }
-    
-//     if (!account) {
-//       return res.status(401).json({ 
-//         message: 'Invalid username or password' 
-//       });
-//     }
-    
-//     // Check password
-//     const isPasswordValid = await account.comparePassword(password);
-//     if (!isPasswordValid) {
-//       return res.status(401).json({ 
-//         message: 'Invalid username or password' 
-//       });
-//     }
-    
-//     // Clean expired tokens
-//     await account.cleanExpiredTokens();
-    
-//     // Generate new tokens
-//     const { accessToken, refreshToken } = generateTokens(account._id,employee.role,account.access);
-    
-//     // Store refresh token in database
-//     account.refreshTokens.push({ token: refreshToken });
-//     await account.save();
-    
-//     // Set cookies
-//     res.cookie('managerAccessToken', accessToken, {
-//       httpOnly: true,
-//       secure: true,
-//       sameSite: 'none',
-//       maxAge: 15 * 60 * 1000 // 15 minutes
-//     });
-    
-//     res.cookie('managerRefreshToken', refreshToken, {
-//       httpOnly: true,
-//       secure: true,
-//       sameSite: 'none',
-//       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-//     });
-    
-//     res.json({ 
-//       message: 'Login successful',
-//       user: { 
-//         id: account._id, 
-//         username: account.username, 
-//         role: employee.role
-//       }
-//     });
-    
-//   } catch (error) {
-//     console.error('Login error:', error);
-//     res.status(500).json({ message: 'Server error during login' });
-//   }
-// });
+
+
+router.get('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (!refreshToken) {
+      return res.status(401).json({ message: 'No refresh token found' });
+    }
+
+    const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
+    const account = await Account.findById(decoded.userId);
+    if (!account) {
+      return res.status(401).json({ message: 'Account not found' });
+    }
+
+    const tokenExists = await Login.findOne({ accountRef: account._id, refreshToken });
+    if (!tokenExists) {
+      return res.status(401).json({ message: 'Invalid refresh token' });
+    }
+
+    const { accessToken } = generateTokens(account._id);
+
+    res.json({
+      accessToken,
+      user: {
+        id: account._id,
+        username: account.username,
+        access: expandAccess(account.access),
+      },
+    });
+  } catch (err) {
+    console.error('Refresh token error:', err);
+    res.clearCookie('refreshToken');
+    res.status(401).json({ message: 'Refresh token invalid or expired' });
+  }
+});
+
+
 
 // GET /me - Check authentication status and refresh token if needed
-router.get('/me', async (req, res) => {
-  try {
-    const { accessToken, refreshToken } = req.cookies;
-    
-    // If no tokens, user is not authenticated
-    if (!accessToken && !refreshToken) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
-    
-    // Try to verify access token first
-    if (accessToken) {
-      try {
-        const decoded = jwt.verify(accessToken, JWT_SECRET);
-        const account = await Account.findById(decoded.userId).select('-password');
-        const employee = await Employee.findOne({ accountRef: account._id });
-        
-        if (account) {
-          return res.json({ 
-            user: { 
-              id: account._id, 
-              username: account.username,
-              access:expandAccess(account.access)
-            }
-          });
-        }
-      } catch (error) {
-        // Access token is invalid/expired, try refresh token
-        console.log(error)
-        console.log('Access token expired, trying refresh token');
-      }
-    }
-    
-    // If access token is invalid/expired, try refresh token
-    if (refreshToken) {
-      try {
-        const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
-        const account = await Account.findById(decoded.userId);
-        const employee = await Employee.findOne({ accountRef: account._id });
-
-        if (!account) {
-          return res.status(401).json({ message: 'Account not found' });
-        }
-        
-        // Check if refresh token exists in database
-        const tokenExists = await Login.findOne({ accountRef: account._id, refreshToken });
-        if (!tokenExists) {
-          return res.status(401).json({ message: 'Invalid refresh token' });
-        }
-        
-        // Generate new access token
-        const { accessToken: newAccessToken } = generateTokens(account._id,employee?.role, account.access);
-        
-        // Set new access token cookie
-        res.cookie('accessToken', newAccessToken, {
-...COOKIE_OPTIONS,
-          maxAge: 15 * 60 * 1000 // 15 minutes
-        });
-        
-        return res.json({ 
-          message: 'Token refreshed',
-          user: { 
-            id: account._id, 
-            username: account.username
-          }
-        });
-        
-      } catch (error) {
-        console.error('Refresh token error:', error);
-        // Clear invalid cookies
-        res.clearCookie('accessToken');
-        res.clearCookie('refreshToken');
-        return res.status(401).json({ message: 'Invalid refresh token' });
-      }
-    }
-    
-    return res.status(401).json({ message: 'Not authenticated' });
-    
-  } catch (error) {
-    console.error('Authentication check error:', error);
-    res.status(500).json({ message: 'Server error during authentication check' });
-  }
+router.get('/me', authenticate, async (req, res) => {
+  const { _id, username, access } = req.user;
+  res.json({
+    user: {
+      id: _id,
+      username,
+      access: expandAccess(access)
+    },
+    ...(req.newAccessToken && { accessToken: req.newAccessToken })
+  });
 });
 
 // POST /logout - Logout user
@@ -337,31 +140,18 @@ router.post('/logout', authenticate, async (req, res) => {
     const { refreshToken } = req.cookies;
 
     if (refreshToken) {
-      // Remove the matching refresh token document
       await Login.findOneAndDelete({
         accountRef: req.user.userId,
-        refreshToken: refreshToken,
+        refreshToken,
       });
     }
-
-    // Clear cookies
-    res.clearCookie('accessToken', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-    });
-
-    res.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-    });
+res.clearCookie('refreshToken',COOKIE_OPTIONS);
 
     res.json({ message: 'Logout successful' });
-  } catch (error) {
-    console.error('Logout error:', error);
+  } catch (err) {
     res.status(500).json({ message: 'Server error during logout' });
   }
 });
+
 
 module.exports = router;
