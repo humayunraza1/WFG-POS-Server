@@ -12,7 +12,7 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET 
 const REFRESH_SECRET = process.env.REFRESH_SECRET
 // Token expiration times
-const ACCESS_TOKEN_EXPIRY = '5m'; // 1d minutes
+const ACCESS_TOKEN_EXPIRY = '12h'; // 1d minutes
 const REFRESH_TOKEN_EXPIRY = '7d'; // 2 days
 
 // Helper function to generate tokens
