@@ -384,7 +384,7 @@ router.get('/registers/active',hasAccess("isManager"), async (req, res) => {
     if (!access.isAdmin && !access.canViewAllRegisters){
 
       const managerId = await Account.find(managerAccId).populate('employeeRef','_id name');
-      const registers = await Register.find({ isOpen: true, managerRef: managerId.employeeRef._id })
+      const registers = await Register.find({ isOpen: true, managerRef: managerAccId })
       .select('sessionId openedAt cashier')
       .populate('cashier', 'username');
       
@@ -398,6 +398,7 @@ router.get('/registers/active',hasAccess("isManager"), async (req, res) => {
     }
 
   } catch (error) {
+    console.log(error)
     res.status(500).json({ message: error.message });
   }
 });
