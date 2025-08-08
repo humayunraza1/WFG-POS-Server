@@ -130,7 +130,7 @@ router.post('/add-account', hasAccess("isManager"), async (req, res) => {
 
     res.status(201).json({
       message: 'Account created successfully',
-      user: { id: newAccount._id, username: newAccount.username }
+      user: newAccount
     });
 
   } catch (error) {
