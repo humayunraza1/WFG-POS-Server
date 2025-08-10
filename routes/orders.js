@@ -230,7 +230,6 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
   }
 });
 
-// Update payment for an order - PATCH route
 router.patch('/:id/payment', async (req, res) => {
   try {
     const cashierId = req.user?.userId;
@@ -248,16 +247,15 @@ router.patch('/:id/payment', async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Check if payment amount is valid
-    if (amountReceived > order.outstandingPayment) {
-      return res.status(400).json({ 
-        message: `Amount cannot exceed outstanding payment of PKR ${order.outstandingPayment}` 
-      });
+    // Calculate new payment values
+    let newAmountPaid = order.amountPaid + amountReceived;
+
+    // Cap at final price
+    if (newAmountPaid >= order.finalPrice) {
+      newAmountPaid = order.finalPrice;
     }
 
-    // Update the payment
-    const newAmountPaid = order.amountPaid + amountReceived;
-    const newOutstandingPayment = order.finalPrice - newAmountPaid;
+    const newOutstandingPayment = Math.max(0, order.finalPrice - newAmountPaid);
     const newPaymentStatus = newOutstandingPayment <= 0 ? 'paid' : 'pending';
 
     // Update the order
@@ -265,11 +263,13 @@ router.patch('/:id/payment', async (req, res) => {
       id,
       {
         amountPaid: newAmountPaid,
-        outstandingPayment: Math.max(0, newOutstandingPayment),
+        outstandingPayment: newOutstandingPayment,
         paymentStatus: newPaymentStatus
       },
       { new: true }
-    ).populate({path: 'items.product',select:'name'}).populate({path:'items.category',select:'name'});
+    )
+      .populate({ path: 'items.product', select: 'name' })
+      .populate({ path: 'items.category', select: 'name' });
 
     // Update register total sales
     await updateRegister(order.registerSession);
