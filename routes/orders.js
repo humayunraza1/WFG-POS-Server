@@ -160,7 +160,7 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
     const { userId } = req.user;
     console.log("Session ID:", sessionId);
     console.log("User ID:", userId);
-    
+    const startCash = await Register.findOne({ sessionId }).select('startCash');
     const result = await Order.aggregate([
       {
         $match: {
@@ -212,17 +212,16 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
         }
       }
     ]);
-
     const dailyStats = result[0] || {
       cashRecvd: 0,
       onlinePaymnt: 0,
       expectedCash: 0,
       expectedOnline: 0,
-      totalSales: 0, 
+      totalSales: 0,
       totalPendingPayment: 0,
-      orderCount: 0 
+      orderCount: 0
     };
-
+    dailyStats.startCash = startCash ? startCash.startCash : 0;
     res.json(dailyStats);
   } catch (error) {
     console.error('Error fetching daily sales:', error);
