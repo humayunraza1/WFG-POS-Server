@@ -40,6 +40,25 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
+// router.post('/register', async (req, res) => {
+//   try {
+//     const { username, password, access,businessRef} = req.body;
+//     if (!username || !password) {
+//       return res.status(400).json({ message: 'Username and password are required' });
+//     }
+//     const existingAccount = await Account.findOne({ username });
+//     if (existingAccount) {
+//       return res.status(409).json({ message: 'Username already exists' });
+//     }
+//     const account = new Account({ username, password, access,businessRef });
+//     await account.save();
+//     res.status(201).json({ message: 'Account created successfully' });
+//   } catch (err) {
+//     console.error('Registration error:', err);
+//     res.status(500).json({ message: 'Server error during registration' });
+//   }
+// });
+
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
