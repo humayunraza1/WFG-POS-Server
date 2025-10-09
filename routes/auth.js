@@ -39,7 +39,7 @@ const COOKIE_OPTIONS = {
   sameSite: isProd ? 'none' : 'lax',   // lax works locally without HTTPS
   path: '/',
 };
-
+///something
 // router.post('/register', async (req, res) => {
 //   try {
 //     const { username, password, access,businessRef} = req.body;
