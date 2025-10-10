@@ -619,7 +619,7 @@ router.get('/expenses', hasAccess("isManager"), async (req, res) => {
 
 // Register Sessions
 // Get all register sessions with optional date filtering and manager filtering
-router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
+router.get('/register/sessions', hasAccess("isManager"), async (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -628,13 +628,9 @@ router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
 
     const account = await Account.findById(userId).populate('employeeRef');
 
-    const managerId = account.employeeRef._id;
-
     const { startDate, endDate } = req.query;
-    
-    // Build filter object
     let filter = {};
-    
+
     // Date filter
     if (startDate || endDate) {
       filter.openedAt = {};
@@ -642,19 +638,27 @@ router.get('/register/sessions',hasAccess("isManager"), async (req, res) => {
         filter.openedAt.$gte = new Date(startDate);
       }
       if (endDate) {
-        // Add 1 day to endDate to include the entire end day
         const endDatePlusOne = new Date(endDate);
         endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
         filter.openedAt.$lt = endDatePlusOne;
       }
     }
+
+    // Restrict by manager access if not admin
     if (!account.access.isAdmin && !account.access.canViewAllRegisters) {
-      // If not admin, filter by manager
       filter.managerRef = userId;
     }
+
     const sessions = await Register.find(filter)
       .populate({
         path: 'orders',
+        populate: {
+          path: 'items.product items.category',
+          select: 'name price'
+        }
+      })
+      .populate({
+        path: 'deletedOrders',
         populate: {
           path: 'items.product items.category',
           select: 'name price'

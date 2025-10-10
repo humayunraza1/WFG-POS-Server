@@ -10,6 +10,10 @@ const registerSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  deletedOrders: [{
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'DeletedOrder'
+}],
       cashier: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Account', // the new cashier user
@@ -40,6 +44,18 @@ const registerSchema = new mongoose.Schema({
     default: 0
   },
   openingBalance: {
+    type: Number,
+    default: 0
+  },
+  deletedCash:{
+    type: Number,
+    default: 0
+  },
+  deletedOnline:{
+    type: Number,
+    default: 0
+  },
+  deletedSales:{
     type: Number,
     default: 0
   },

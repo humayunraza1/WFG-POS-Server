@@ -8,6 +8,7 @@ const authenticate = require('../middleware/authenticate');
 const hasAccess = require('../middleware/hasAccess');
 const updateRegister = require('../utils/updateRegister');
 const Account = require('../models/Account');
+const DeletedOrder = require('../models/DeletedOrder');
 
 router.use(authenticate);
 
@@ -286,34 +287,63 @@ router.patch('/:id/payment', async (req, res) => {
 });
 
 
-// Delete order
-router.delete('/delete/:id',hasAccess("canDeleteOrder"), async (req, res) => {
+// Delete order with tracking
+router.delete('/delete/:id', hasAccess("canDeleteOrder"), async (req, res) => {
   const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const order = await Order.findById(req.params.id);
-    if (!order) {
-      throw new Error('Order not found');
-    }
-    session.startTransaction();
+    if (!order) throw new Error('Order not found');
 
-    // Update register total sales with only the amount actually paid
-            await Register.findOneAndUpdate(
-              { isOpen: true, sessionId: order.registerSession },
-              { $pull: { orders: order._id }},
-              {session}
-            );  
-    await updateRegister(order.registerSession,session);
+    const reason = req.body.reason || 'No reason provided';
+    const deletedBy = req.user?.userId; // assuming user is attached via auth middleware
+    
+    // 1️⃣ Create a DeletedOrder record
+    const deletedOrder = await DeletedOrder.create([{
+      originalOrderId: order._id,
+      registerSession: order.registerSession,
+      cashier: order.cashier,
+      branchCode: order.branchCode,
+      items: order.items,
+      discount: order.discount,
+      paymentType: order.paymentType,
+      actualPrice: order.actualPrice,
+      finalPrice: order.finalPrice,
+      amountPaid: order.amountPaid,
+      paymentStatus: order.paymentStatus,
+      dateOrdered: order.dateOrdered,
+      deletedBy,
+      deleteReason: reason,
+      deletedAt: new Date()
+    }], { session });
 
-    await Order.findByIdAndDelete(req.params.id,{session})
-    await session.commitTransaction()
-    res.json({ message: 'Order deleted',id:req.params.id });
+    // 2️⃣ Remove from Register.orders & add to Register.deletedOrders
+    await Register.findOneAndUpdate(
+      { isOpen: true, sessionId: order.registerSession },
+      {
+        $pull: { orders: order._id },
+        $push: { deletedOrders: deletedOrder[0]._id }
+      },
+      { session }
+    );
+
+    // 3️⃣ Update register totals
+    
+    // 4️⃣ Delete the original order
+    await Order.findByIdAndDelete(order._id, { session });
+    await updateRegister(order.registerSession, session);
+
+    await session.commitTransaction();
+    res.json({ message: 'Order deleted and logged', id: req.params.id });
+
   } catch (error) {
-        await session.abortTransaction();
-        console.log(error)
-    res.status(500).json({ message: error.message});
-  }finally{
-    session.endSession()
+    await session.abortTransaction();
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  } finally {
+    session.endSession();
   }
 });
+
 
 module.exports = router;
