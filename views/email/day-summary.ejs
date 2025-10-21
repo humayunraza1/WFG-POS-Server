@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title><%= business.name %> – Daily Register Summary</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+      font-size: 14px;
+    }
+
+    .wrapper {
+      width: 100%;
+      padding: 20px 0;
+    }
+
+    .content {
+      max-width: 640px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    }
+
+    .header {
+      padding: 25px;
+      text-align: center;
+      background: #fafafa;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .logo {
+      max-height: 65px;
+      margin-bottom: 10px;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #333;
+      margin: 0;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #777;
+      margin-top: 4px;
+    }
+
+    .section {
+      padding: 20px 25px;
+    }
+
+    .section h2 {
+      margin-top: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #f2f2f2;
+      padding-bottom: 5px;
+    }
+
+    p {
+      color: #555;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+
+    th {
+      background-color: #f7f7f7;
+      text-align: left;
+      font-weight: 600;
+      color: #444;
+    }
+
+    td {
+      color: #333;
+      font-weight: 400;
+    }
+
+    td.text-right {
+      text-align: right;
+    }
+
+    .totals {
+      width: 100%;
+      border-top: 1px solid #eee;
+      margin-top: 20px;
+      padding-top: 10px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    .total-item {
+      padding: 8px 0;
+      line-height: 1.6;
+      display: table;
+      width: 100%;
+    }
+
+    .total-item .label {
+      color: #333;
+      font-weight: 500;
+      display: inline;
+    }
+
+    .total-item .dots {
+      display: inline;
+      letter-spacing: 2px;
+      color: #999;
+      margin: 0 8px;
+    }
+
+    .total-item .value {
+      color: #222;
+      font-weight: 600;
+      float: right;
+    }
+
+    .total-item.total-discount .value {
+      color: #c0392b;
+    }
+
+    .total-item.total-final {
+      padding-top: 12px;
+      border-top: 1px solid #e0e0e0;
+      margin-top: 4px;
+    }
+
+    .total-item.total-final .value {
+      color: #16a34a;
+      font-weight: 700;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      padding: 20px;
+      background: #fafafa;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .footer a {
+      color: #555;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="content">
+      <!-- HEADER -->
+      <div class="header">
+        <% if (business.logo) { %>
+          <img src="cid:logo@inline" alt="<%= business.name %> Logo" class="logo" />
+        <% } %>
+        <h1 class="title"><%= business.name %></h1>
+        <p class="subtitle">Daily Register Summary</p>
+      </div>
+
+      <!-- BODY -->
+      <div class="section">
+        <p>Hello <strong><%= business.name %></strong>,</p>
+        <p>Here is the daily summary for your register session:</p>
+
+        <h2>Items Sold</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Quantity</th>
+              <th class="text-right">Revenue (PKR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% summary.itemSummary.forEach(function(item) { %>
+              <tr>
+                <td><%= item.name %></td>
+                <td><%= item.totalCount %></td>
+                <td class="text-right"><%= item.totalRevenue.toLocaleString() %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+
+        <!-- TOTALS SECTION -->
+        <div class="totals">
+          <div class="total-item">
+            <span class="label">Absolute Total</span>
+            <span class="value">Rs <%= summary.absoluteTotal.toLocaleString() %></span>
+          </div>
+          <div class="total-item total-discount">
+            <span class="label">Discount Given</span>
+            <span class="value">- Rs <%= summary.totalDiscount.toLocaleString() %></span>
+          </div>
+          <div class="total-item total-final">
+            <span class="label">Final Amount Sold</span>
+            <span class="value">Rs <%= summary.finalAmountSold.toLocaleString() %></span>
+          </div>
+        </div>
+
+        <h2 style="margin-top: 30px;">Payment Breakdown</h2>
+        <div class="totals" style="border-top: none; margin-top: 10px; padding-top: 0;">
+          <div class="total-item">
+            <span class="label">Cash Received</span>
+            <span class="value">Rs <%= summary.cashRecvd.toLocaleString() %></span>
+          </div>
+          <div class="total-item">
+            <span class="label">Online Received</span>
+            <span class="value">Rs <%= summary.onlineRecvd.toLocaleString() %></span>
+          </div>
+        </div>
+
+        <h2 style="margin-top: 30px;">Expenses & Balance</h2>
+        <div class="totals" style="border-top: none; margin-top: 10px; padding-top: 0;">
+          <div class="total-item total-discount">
+            <span class="label">Total Expenses</span>
+            <span class="value">- Rs <%= summary.totalExpenses.toLocaleString() %></span>
+          </div>
+          <div class="total-item total-final">
+            <span class="label">Closing Balance</span>
+            <span class="value">Rs <%= summary.closingBalance.toLocaleString() %></span>
+          </div>
+        </div>
+
+        <p style="margin-top:20px;">
+          Thank you for using <strong><%= footer.company %></strong>.
+          Have a great day!
+        </p>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="footer">
+        &copy; <%= new Date().getFullYear() %> <%= footer.company %>. All rights reserved.<br>
+        Contact us: <a href="mailto:<%= footer.email %>"><%= footer.email %></a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

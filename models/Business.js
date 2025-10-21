@@ -11,6 +11,7 @@ const businessSchema = new mongoose.Schema({
   },
   preferences: {
     trackServers: { type: Boolean, default: false }, // business-wide feature toggle
+    sendDaySummaryReport: { type: Boolean, default: false }
   }
 });
 module.exports = mongoose.model('Business', businessSchema);

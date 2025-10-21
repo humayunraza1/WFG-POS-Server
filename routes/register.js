@@ -7,6 +7,7 @@ const Employee = require('../models/Employees');
 const { v4: uuidv4 } = require('uuid');
 const authenticate = require('../middleware/authenticate');
 const Account = require('../models/Account');
+const { sendDailySummaryEmail } = require('../services/emailService');
 
 router.use(authenticate);
 
@@ -94,40 +95,42 @@ router.post('/open', async (req, res) => {
 router.post('/close', async (req, res) => {
   try {
     const cashierId = req.user?.userId;
+
+    // fetch register with orders & expenses populated
     const register = await Register.findOne({ isOpen: true, cashier: cashierId })
-      .populate('orders')
+      .populate({
+        path: 'orders',
+        populate: {
+          path: 'items.product',
+          select: 'name'
+        }
+      })
       .populate('expenses');
-    
+
     if (!register) {
       return res.status(400).json({ message: 'Register is not open' });
     }
 
     const { finalCash } = req.body;
-    
     if (finalCash === undefined || finalCash < 0) {
       return res.status(400).json({ message: 'Final cash amount is required and must be positive' });
     }
 
-    // Get all orders and expenses for this session
-    // const sessionOrders = await Order.find({ registerSession: register.sessionId });
-    // const sessionExpenses = await Expense.find({ registerSession: register.sessionId });
-
-    // Calculate cash payment totals
+    // ---- Existing calculations (always compute) ----
     const cashOrders = register.orders.filter(order => order.paymentType === 'cash');
-    const cashRecvd = cashOrders.reduce((sum, order) => sum + order.amountPaid, 0);
-    const expectedCash = cashOrders.reduce((sum, order) => sum + order.finalPrice, 0);
-    // Calculate online payment totals
     const onlineOrders = register.orders.filter(order => order.paymentType === 'online');
-    const onlineRecvd = onlineOrders.reduce((sum, order) => sum + order.amountPaid, 0);
-    const expectedOnline = onlineOrders.reduce((sum, order) => sum + order.finalPrice, 0);
-    // console.log(cashOrders)
-    
-    // Calculate totals
-    const totalSales = register.orders.reduce((sum, order) => sum + order.finalPrice, 0);
-    const totalExpenses = register.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+    const cashRecvd = cashOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+    const expectedCash = cashOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+
+    const onlineRecvd = onlineOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+    const expectedOnline = onlineOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+
+    const totalSales = register.orders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+    const totalExpenses = register.expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
     const expectedBalance = register.startCash + expectedCash - totalExpenses;
 
-    // Update register with final data
+    // ---- Update register fields (before save) ----
     register.isOpen = false;
     register.closedAt = new Date();
     register.closingBalance = finalCash;
@@ -140,9 +143,75 @@ router.post('/close', async (req, res) => {
     register.onlineRecvd = onlineRecvd;
 
     const closedRegister = await register.save();
-    res.json(closedRegister);
+
+    // ---- Fetch cashier account and business preferences ----
+    const cashierAccount = await Account.findById(cashierId).populate('businessRef');
+    const business = cashierAccount?.businessRef;
+
+    // Prepare response container
+    let summary = null;
+
+    // Only create summary and send email if business pref is enabled
+    if (business?.preferences?.sendDaySummaryReport) {
+      try {
+        // Aggregate per-item summary using product.name + optionName
+        const itemSummaryMap = {};
+        let absoluteTotal = 0;
+
+        (register.orders || []).forEach(order => {
+          (order.items || []).forEach(item => {
+            const productName = item.product?.name || 'Unknown Product';
+            const optionName = item.optionName ? ` - ${item.optionName}` : '';
+            const name = `${productName}${optionName}`;
+
+            if (!itemSummaryMap[name]) {
+              itemSummaryMap[name] = { totalCount: 0, totalRevenue: 0 };
+            }
+
+            itemSummaryMap[name].totalCount += (item.quantity || 0);
+            itemSummaryMap[name].totalRevenue += (item.totalPrice || 0);
+            absoluteTotal += (item.totalPrice || 0);
+          });
+        });
+
+        const itemSummaryArray = Object.entries(itemSummaryMap).map(([name, data]) => ({
+          name,
+          totalCount: data.totalCount,
+          totalRevenue: data.totalRevenue,
+        }));
+
+        const totalDiscount = register.totalDiscount || 0;
+        const finalAmountSold = absoluteTotal - totalDiscount;
+
+        summary = {
+          itemSummary: itemSummaryArray,
+          absoluteTotal,
+          totalDiscount,
+          finalAmountSold,
+          // optional: include cash/online/expenses/closing for email convenience
+          cashRecvd,
+          onlineRecvd,
+          totalExpenses,
+          closingBalance: finalCash,
+        };
+
+        // Send email (uses your utils/emailService.js which uses utils/mailer.js)
+        await sendDailySummaryEmail(business, summary);
+      } catch (summaryErr) {
+        // Log but don't fail the close operation
+        console.error('Error creating/sending daily summary:', summaryErr);
+      }
+    }
+
+    // ---- Final Response ----
+    return res.json({
+      message: 'Register closed successfully',
+      register: closedRegister,
+      summary // null if not generated, otherwise the object
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Error closing register:', error);
+    return res.status(400).json({ message: error.message });
   }
 });
 
