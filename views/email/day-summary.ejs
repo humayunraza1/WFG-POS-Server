@@ -2,99 +2,95 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title><%= business.name %> – Daily Register Summary</title>
+  <title><%= business.name %> – Daily Summary</title>
   <style>
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
+      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+      background-color: #f5f6fa;
       margin: 0;
       padding: 0;
-      background: #f4f4f4;
-      font-size: 14px;
+      color: #333;
     }
 
     .wrapper {
       width: 100%;
-      padding: 20px 0;
+      padding: 30px 0;
     }
 
-    .content {
-      max-width: 640px;
+    .card {
+      max-width: 700px;
       margin: 0 auto;
-      background: #ffffff;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
       overflow: hidden;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
     }
 
     .header {
-      padding: 25px;
+      background: linear-gradient(135deg, #2563eb, #1e40af);
+      color: white;
       text-align: center;
-      background: #fafafa;
-      border-bottom: 1px solid #e0e0e0;
+      padding: 30px 20px;
     }
 
-    .logo {
-      max-height: 65px;
-      margin-bottom: 10px;
+    .header img {
+      max-height: 60px;
+      margin-bottom: 12px;
     }
 
-    .title {
-      font-size: 22px;
-      font-weight: 600;
-      color: #333;
+    .header h1 {
+      font-size: 24px;
       margin: 0;
+      font-weight: 600;
     }
 
-    .subtitle {
+    .header p {
+      margin: 6px 0 0;
       font-size: 14px;
-      color: #777;
-      margin-top: 4px;
+      opacity: 0.9;
     }
 
     .section {
-      padding: 20px 25px;
+      padding: 25px 30px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .section:last-child {
+      border-bottom: none;
     }
 
     .section h2 {
-      margin-top: 0;
       font-size: 18px;
+      margin-top: 0;
+      color: #111;
+      border-left: 4px solid #2563eb;
+      padding-left: 10px;
       font-weight: 600;
-      color: #333;
-      border-bottom: 2px solid #f2f2f2;
-      padding-bottom: 5px;
-    }
-
-    p {
-      color: #555;
-      line-height: 1.5;
-      font-size: 14px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 10px;
-      margin-bottom: 20px;
-      font-family: 'Segoe UI', Arial, sans-serif;
+      margin-top: 12px;
+      border-radius: 8px;
+      overflow: hidden;
     }
 
     th, td {
-      border: 1px solid #ddd;
-      padding: 8px 10px;
+      text-align: left;
+      padding: 10px 12px;
       font-size: 14px;
     }
 
     th {
-      background-color: #f7f7f7;
-      text-align: left;
+      background: #f3f4f6;
+      color: #333;
       font-weight: 600;
-      color: #444;
+      border-bottom: 2px solid #e5e7eb;
     }
 
     td {
-      color: #333;
-      font-weight: 400;
+      border-bottom: 1px solid #f0f0f0;
     }
 
     td.text-right {
@@ -102,53 +98,41 @@
     }
 
     .totals {
-      width: 100%;
-      border-top: 1px solid #eee;
-      margin-top: 20px;
-      padding-top: 10px;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      font-size: 14px;
+      margin-top: 15px;
     }
 
     .total-item {
-      padding: 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 15px;
       line-height: 1.6;
-      display: table;
       width: 100%;
     }
 
     .total-item .label {
       color: #333;
       font-weight: 500;
-      display: inline;
-    }
-
-    .total-item .dots {
-      display: inline;
-      letter-spacing: 2px;
-      color: #999;
-      margin: 0 8px;
+      flex: 0 1 auto;
+      text-align: left;
     }
 
     .total-item .value {
-      color: #222;
+      color: #111;
       font-weight: 600;
-      float: right;
+      text-align: right;
+      white-space: nowrap;
+      flex: 0 1 auto;
+      margin-left: auto;
     }
 
-    .total-item.total-discount .value {
-      color: #c0392b;
+    .total-item.negative .value {
+      color: #dc2626;
     }
 
-    .total-item.total-final {
-      padding-top: 12px;
-      border-top: 1px solid #e0e0e0;
-      margin-top: 4px;
-    }
-
-    .total-item.total-final .value {
+    .total-item.positive .value {
       color: #16a34a;
-      font-weight: 700;
     }
 
     .footer {
@@ -156,38 +140,74 @@
       font-size: 12px;
       color: #777;
       padding: 20px;
-      background: #fafafa;
-      border-top: 1px solid #e0e0e0;
+      background: #f9fafb;
     }
 
     .footer a {
-      color: #555;
+      color: #2563eb;
       text-decoration: none;
-      font-weight: 500;
     }
 
     .footer a:hover {
       text-decoration: underline;
     }
+
+    @media (max-width: 600px) {
+      .card {
+        margin: 10px;
+      }
+      .section {
+        padding: 20px;
+      }
+      th, td {
+        font-size: 13px;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="wrapper">
-    <div class="content">
-      <!-- HEADER -->
+    <div class="card">
+      <!-- Header -->
       <div class="header">
         <% if (business.logo) { %>
-          <img src="cid:logo@inline" alt="<%= business.name %> Logo" class="logo" />
+          <img src="cid:logo@inline" alt="<%= business.name %> Logo">
         <% } %>
-        <h1 class="title"><%= business.name %></h1>
-        <p class="subtitle">Daily Register Summary</p>
+        <h1><%= business.name %></h1>
+        <p>Daily Register Summary</p>
       </div>
 
-      <!-- BODY -->
+      <!-- Intro -->
       <div class="section">
-        <p>Hello <strong><%= business.name %></strong>,</p>
-        <p>Here is the daily summary for your register session:</p>
+        <p>Hi <strong><%= business.name %></strong>,</p>
+        <p>Here's your daily sales summary for the register session.</p>
+      </div>
 
+      <!-- Category Summary -->
+      <div class="section">
+        <h2>Category Summary</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Quantity</th>
+              <th class="text-right">Revenue (PKR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% summary.categorySummary.forEach(function(cat) { %>
+              <tr>
+                <td><%= cat.category %></td>
+                <td><%= cat.totalCount %></td>
+                <td class="text-right"><%= cat.totalRevenue.toLocaleString() %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Item Summary -->
+      <div class="section">
         <h2>Items Sold</h2>
         <table>
           <thead>
@@ -204,28 +224,34 @@
                 <td><%= item.totalCount %></td>
                 <td class="text-right"><%= item.totalRevenue.toLocaleString() %></td>
               </tr>
-            <% }); %>
+            <% }) %>
           </tbody>
         </table>
+      </div>
 
-        <!-- TOTALS SECTION -->
+      <!-- Totals -->
+      <div class="section">
+        <h2>Sales Summary</h2>
         <div class="totals">
           <div class="total-item">
             <span class="label">Absolute Total</span>
             <span class="value">Rs <%= summary.absoluteTotal.toLocaleString() %></span>
           </div>
-          <div class="total-item total-discount">
+          <div class="total-item negative">
             <span class="label">Discount Given</span>
             <span class="value">- Rs <%= summary.totalDiscount.toLocaleString() %></span>
           </div>
-          <div class="total-item total-final">
+          <div class="total-item positive">
             <span class="label">Final Amount Sold</span>
             <span class="value">Rs <%= summary.finalAmountSold.toLocaleString() %></span>
           </div>
         </div>
+      </div>
 
-        <h2 style="margin-top: 30px;">Payment Breakdown</h2>
-        <div class="totals" style="border-top: none; margin-top: 10px; padding-top: 0;">
+      <!-- Payment Breakdown -->
+      <div class="section">
+        <h2>Payment Breakdown</h2>
+        <div class="totals">
           <div class="total-item">
             <span class="label">Cash Received</span>
             <span class="value">Rs <%= summary.cashRecvd.toLocaleString() %></span>
@@ -235,29 +261,27 @@
             <span class="value">Rs <%= summary.onlineRecvd.toLocaleString() %></span>
           </div>
         </div>
+      </div>
 
-        <h2 style="margin-top: 30px;">Expenses & Balance</h2>
-        <div class="totals" style="border-top: none; margin-top: 10px; padding-top: 0;">
-          <div class="total-item total-discount">
+      <!-- Expenses -->
+      <div class="section">
+        <h2>Expenses & Balance</h2>
+        <div class="totals">
+          <div class="total-item negative">
             <span class="label">Total Expenses</span>
             <span class="value">- Rs <%= summary.totalExpenses.toLocaleString() %></span>
           </div>
-          <div class="total-item total-final">
+          <div class="total-item positive">
             <span class="label">Closing Balance</span>
             <span class="value">Rs <%= summary.closingBalance.toLocaleString() %></span>
           </div>
         </div>
-
-        <p style="margin-top:20px;">
-          Thank you for using <strong><%= footer.company %></strong>.
-          Have a great day!
-        </p>
       </div>
 
-      <!-- FOOTER -->
+      <!-- Footer -->
       <div class="footer">
         &copy; <%= new Date().getFullYear() %> <%= footer.company %>. All rights reserved.<br>
-        Contact us: <a href="mailto:<%= footer.email %>"><%= footer.email %></a>
+        Need help? <a href="mailto:<%= footer.email %>"><%= footer.email %></a>
       </div>
     </div>
   </div>

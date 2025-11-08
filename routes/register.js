@@ -96,13 +96,17 @@ router.post('/close', async (req, res) => {
   try {
     const cashierId = req.user?.userId;
 
-    // fetch register with orders & expenses populated
+    // ---- Fetch register with nested population ----
     const register = await Register.findOne({ isOpen: true, cashier: cashierId })
       .populate({
         path: 'orders',
         populate: {
           path: 'items.product',
-          select: 'name'
+          populate: {
+            path: 'category',
+            select: 'name'
+          },
+          select: 'name category'
         }
       })
       .populate('expenses');
@@ -116,7 +120,7 @@ router.post('/close', async (req, res) => {
       return res.status(400).json({ message: 'Final cash amount is required and must be positive' });
     }
 
-    // ---- Existing calculations (always compute) ----
+    // ---- Compute all totals ----
     const cashOrders = register.orders.filter(order => order.paymentType === 'cash');
     const onlineOrders = register.orders.filter(order => order.paymentType === 'online');
 
@@ -130,7 +134,7 @@ router.post('/close', async (req, res) => {
     const totalExpenses = register.expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
     const expectedBalance = register.startCash + expectedCash - totalExpenses;
 
-    // ---- Update register fields (before save) ----
+    // ---- Update register fields ----
     register.isOpen = false;
     register.closedAt = new Date();
     register.closingBalance = finalCash;
@@ -144,18 +148,17 @@ router.post('/close', async (req, res) => {
 
     const closedRegister = await register.save();
 
-    // ---- Fetch cashier account and business preferences ----
+    // ---- Fetch cashier + business preferences ----
     const cashierAccount = await Account.findById(cashierId).populate('businessRef');
     const business = cashierAccount?.businessRef;
 
-    // Prepare response container
+    // ---- Prepare summary ----
     let summary = null;
 
-    // Only create summary and send email if business pref is enabled
     if (business?.preferences?.sendDaySummaryReport) {
       try {
-        // Aggregate per-item summary using product.name + optionName
         const itemSummaryMap = {};
+        const categorySummaryMap = {};
         let absoluteTotal = 0;
 
         (register.orders || []).forEach(order => {
@@ -163,13 +166,22 @@ router.post('/close', async (req, res) => {
             const productName = item.product?.name || 'Unknown Product';
             const optionName = item.optionName ? ` - ${item.optionName}` : '';
             const name = `${productName}${optionName}`;
+            const categoryName = item.product?.category?.name || 'Uncategorized';
 
+            // ---- Per-item aggregation ----
             if (!itemSummaryMap[name]) {
               itemSummaryMap[name] = { totalCount: 0, totalRevenue: 0 };
             }
-
             itemSummaryMap[name].totalCount += (item.quantity || 0);
             itemSummaryMap[name].totalRevenue += (item.totalPrice || 0);
+
+            // ---- Per-category aggregation ----
+            if (!categorySummaryMap[categoryName]) {
+              categorySummaryMap[categoryName] = { totalCount: 0, totalRevenue: 0 };
+            }
+            categorySummaryMap[categoryName].totalCount += (item.quantity || 0);
+            categorySummaryMap[categoryName].totalRevenue += (item.totalPrice || 0);
+
             absoluteTotal += (item.totalPrice || 0);
           });
         });
@@ -180,40 +192,47 @@ router.post('/close', async (req, res) => {
           totalRevenue: data.totalRevenue,
         }));
 
+        const categorySummaryArray = Object.entries(categorySummaryMap).map(([category, data]) => ({
+          category,
+          totalCount: data.totalCount,
+          totalRevenue: data.totalRevenue,
+        }));
+
         const totalDiscount = register.totalDiscount || 0;
         const finalAmountSold = absoluteTotal - totalDiscount;
 
         summary = {
           itemSummary: itemSummaryArray,
+          categorySummary: categorySummaryArray, // 👈 Added category summary
           absoluteTotal,
           totalDiscount,
           finalAmountSold,
-          // optional: include cash/online/expenses/closing for email convenience
           cashRecvd,
           onlineRecvd,
           totalExpenses,
           closingBalance: finalCash,
         };
 
-        // Send email (uses your utils/emailService.js which uses utils/mailer.js)
+        // ---- Send daily summary email ----
         await sendDailySummaryEmail(business, summary);
       } catch (summaryErr) {
-        // Log but don't fail the close operation
         console.error('Error creating/sending daily summary:', summaryErr);
       }
     }
 
-    // ---- Final Response ----
+    // ---- Final response ----
     return res.json({
       message: 'Register closed successfully',
       register: closedRegister,
-      summary // null if not generated, otherwise the object
+      summary
     });
+
   } catch (error) {
     console.error('Error closing register:', error);
     return res.status(400).json({ message: error.message });
   }
 });
+
 
 // Update last activity
 router.post('/activity', async (req, res) => {
