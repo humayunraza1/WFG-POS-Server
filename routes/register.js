@@ -168,10 +168,12 @@ router.post('/close', async (req, res) => {
             const name = `${productName}${optionName}`;
             const categoryName = item.product?.category?.name || 'Uncategorized';
 
-            // ---- Per-item aggregation ----
+            // ---- Per-item aggregation (also track category) ----
             if (!itemSummaryMap[name]) {
-              itemSummaryMap[name] = { totalCount: 0, totalRevenue: 0 };
+              itemSummaryMap[name] = { totalCount: 0, totalRevenue: 0, category: categoryName };
             }
+            // If the item name appears under multiple categories (rare), prefer the first seen
+            if (!itemSummaryMap[name].category) itemSummaryMap[name].category = categoryName;
             itemSummaryMap[name].totalCount += (item.quantity || 0);
             itemSummaryMap[name].totalRevenue += (item.totalPrice || 0);
 
@@ -188,6 +190,7 @@ router.post('/close', async (req, res) => {
 
         const itemSummaryArray = Object.entries(itemSummaryMap).map(([name, data]) => ({
           name,
+          category: data.category || 'Uncategorized',
           totalCount: data.totalCount,
           totalRevenue: data.totalRevenue,
         }));
@@ -229,6 +232,114 @@ router.post('/close', async (req, res) => {
 
   } catch (error) {
     console.error('Error closing register:', error);
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+// Live summary for open register (used by client to show live counts)
+router.get('/live-summary', async (req, res) => {
+  try {
+    const cashierId = req.user?.userId;
+    const { sessionId } = req.query;
+
+    // If sessionId provided, prefer that register, otherwise use active open register for cashier
+    const query = sessionId ? { sessionId } : { isOpen: true, cashier: cashierId };
+
+    const register = await Register.findOne(query)
+      .populate({
+        path: 'orders',
+        populate: {
+          path: 'items.product',
+          populate: {
+            path: 'category',
+            select: 'name'
+          },
+          select: 'name category'
+        }
+      })
+      .populate('expenses');
+
+    if (!register) {
+      return res.status(400).json({ message: 'Register not found or not open' });
+    }
+
+    // ---- Compute aggregates (same as close but without mutating register) ----
+    const cashOrders = (register.orders || []).filter(order => order.paymentType === 'cash');
+    const onlineOrders = (register.orders || []).filter(order => order.paymentType === 'online');
+
+    const cashRecvd = cashOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+    const expectedCash = cashOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+
+    const onlineRecvd = onlineOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+    const expectedOnline = onlineOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+
+    const totalSales = (register.orders || []).reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+    const totalExpenses = (register.expenses || []).reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+    // Build per-item and per-category summaries
+    const itemSummaryMap = {};
+    const categorySummaryMap = {};
+    let absoluteTotal = 0;
+
+    (register.orders || []).forEach(order => {
+      (order.items || []).forEach(item => {
+        const productName = item.product?.name || 'Unknown Product';
+        const optionName = item.optionName ? ` - ${item.optionName}` : '';
+        const name = `${productName}${optionName}`;
+        const categoryName = item.product?.category?.name || 'Uncategorized';
+
+        if (!itemSummaryMap[name]) {
+          itemSummaryMap[name] = { totalCount: 0, totalRevenue: 0, category: categoryName };
+        }
+        if (!itemSummaryMap[name].category) itemSummaryMap[name].category = categoryName;
+        itemSummaryMap[name].totalCount += (item.quantity || 0);
+        itemSummaryMap[name].totalRevenue += (item.totalPrice || 0);
+
+        if (!categorySummaryMap[categoryName]) {
+          categorySummaryMap[categoryName] = { totalCount: 0, totalRevenue: 0 };
+        }
+        categorySummaryMap[categoryName].totalCount += (item.quantity || 0);
+        categorySummaryMap[categoryName].totalRevenue += (item.totalPrice || 0);
+
+        absoluteTotal += (item.totalPrice || 0);
+      });
+    });
+
+    const itemSummaryArray = Object.entries(itemSummaryMap).map(([name, data]) => ({
+      name,
+      category: data.category || 'Uncategorized',
+      totalCount: data.totalCount,
+      totalRevenue: data.totalRevenue,
+    }));
+
+    const categorySummaryArray = Object.entries(categorySummaryMap).map(([category, data]) => ({
+      category,
+      totalCount: data.totalCount,
+      totalRevenue: data.totalRevenue,
+    }));
+
+    const totalDiscount = register.totalDiscount || 0;
+    const finalAmountSold = absoluteTotal - totalDiscount;
+
+    const summary = {
+      itemSummary: itemSummaryArray,
+      categorySummary: categorySummaryArray,
+      absoluteTotal,
+      totalDiscount,
+      finalAmountSold,
+      cashRecvd,
+      onlineRecvd,
+      totalExpenses,
+      // include a few register meta fields for client convenience
+      sessionId: register.sessionId,
+      openedAt: register.openedAt,
+      startCash: register.startCash,
+      manager: register.manager,
+    };
+
+    return res.json({ summary, register: { _id: register._id, sessionId: register.sessionId, isOpen: register.isOpen } });
+  } catch (error) {
+    console.error('Error fetching live summary:', error);
     return res.status(400).json({ message: error.message });
   }
 });
