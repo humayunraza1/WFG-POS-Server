@@ -68,20 +68,20 @@ router.get('/employees-without-accounts', hasAccess('isManager'), async (req, re
 });
 
 
-// router.post('/add-admin',async(req,res)=>{
-//   try{
-//     const {username,password,access={},businessRef} = req.body;
-//         const newAccount = new Account({ username, password, access });
-//     await newAccount.save();
-//       res.status(201).json({
-//       message: 'Account created successfully',
-//       user: { id: newAccount._id, username: newAccount.username }
-//     });
-//   }catch(err){
-//     res.status(500).json({ message: 'Server error during account creation',err });
-//   }
+router.post('/add-admin',async(req,res)=>{
+  try{
+    const {username,password,access={},businessRef} = req.body;
+        const newAccount = new Account({ username, password, access,businessRef});
+    await newAccount.save();
+      res.status(201).json({
+      message: 'Account created successfully',
+      user: { id: newAccount._id, username: newAccount.username }
+    });
+  }catch(err){
+    res.status(500).json({ message: 'Server error during account creation',err });
+  }
 
-// })
+})
 
 router.post('/add-account', hasAccess("isManager"), async (req, res) => {
   try {
