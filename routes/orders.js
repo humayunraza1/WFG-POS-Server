@@ -189,6 +189,15 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
               ]
             }
           },
+          cardPaymnt: {
+            $sum: {
+              $cond: [
+                { $eq: ['$paymentType', 'card'] },
+                '$amountPaid',
+                0
+              ]
+            }
+          },
           expectedCash: {
             $sum: {
               $cond: [
@@ -207,6 +216,15 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
               ]
             }
           },
+          expectedCard: {
+            $sum: {
+              $cond: [
+                { $eq: ['$paymentType', 'card'] },
+                '$finalPrice',
+                0
+              ]
+            }
+          },
           totalSales: { $sum: '$finalPrice' },
           totalPendingPayment: { $sum: '$outstandingPayment' },
           orderCount: { $sum: 1 }
@@ -216,13 +234,17 @@ router.get('/daily-sales/:sessionId', async (req, res) => {
     const dailyStats = result[0] || {
       cashRecvd: 0,
       onlinePaymnt: 0,
+      cardPaymnt: 0,
       expectedCash: 0,
       expectedOnline: 0,
+      expectedCard: 0,
       totalSales: 0,
       totalPendingPayment: 0,
       orderCount: 0
     };
     dailyStats.startCash = startCash ? startCash.startCash : 0;
+    dailyStats.digitalPaymnt = (dailyStats.onlinePaymnt || 0) + (dailyStats.cardPaymnt || 0);
+    dailyStats.expectedDigital = (dailyStats.expectedOnline || 0) + (dailyStats.expectedCard || 0);
     res.json(dailyStats);
   } catch (error) {
     console.error('Error fetching daily sales:', error);

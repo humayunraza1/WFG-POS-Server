@@ -40,24 +40,24 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 ///something
-// router.post('/register', async (req, res) => {
-//   try {
-//     const { username, password, access,businessRef} = req.body;
-//     if (!username || !password) {
-//       return res.status(400).json({ message: 'Username and password are required' });
-//     }
-//     const existingAccount = await Account.findOne({ username });
-//     if (existingAccount) {
-//       return res.status(409).json({ message: 'Username already exists' });
-//     }
-//     const account = new Account({ username, password, access,businessRef });
-//     await account.save();
-//     res.status(201).json({ message: 'Account created successfully' });
-//   } catch (err) {
-//     console.error('Registration error:', err);
-//     res.status(500).json({ message: 'Server error during registration' });
-//   }
-// });
+router.post('/register', async (req, res) => {
+  try {
+    const { username, password, access,businessRef} = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+    const existingAccount = await Account.findOne({ username });
+    if (existingAccount) {
+      return res.status(409).json({ message: 'Username already exists' });
+    }
+    const account = new Account({ username, password, access,businessRef });
+    await account.save();
+    res.status(201).json({ message: 'Account created successfully' });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ message: 'Server error during registration' });
+  }
+});
 
 router.post('/login', async (req, res) => {
   try {
@@ -169,6 +169,34 @@ res.clearCookie('refreshToken',COOKIE_OPTIONS);
     res.json({ message: 'Logout successful' });
   } catch (err) {
     res.status(500).json({ message: 'Server error during logout' });
+  }
+});
+
+// POST /reset-password - Reset password for an account
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { username, newPassword } = req.body;
+
+    if (!username || !newPassword) {
+      return res.status(400).json({ message: 'Username and new password are required' });
+    }
+
+    const account = await Account.findOne({ username });
+    if (!account) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+
+    // Update password (pre-save hook will hash it)
+    account.password = newPassword;
+    await account.save();
+
+    // Invalidate all refresh tokens for this account
+    await Login.deleteMany({ accountRef: account._id });
+
+    res.json({ message: 'Password reset successful' });
+  } catch (err) {
+    console.error('Password reset error:', err);
+    res.status(500).json({ message: 'Server error during password reset' });
   }
 });
 

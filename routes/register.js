@@ -123,12 +123,15 @@ router.post('/close', async (req, res) => {
     // ---- Compute all totals ----
     const cashOrders = register.orders.filter(order => order.paymentType === 'cash');
     const onlineOrders = register.orders.filter(order => order.paymentType === 'online');
+    const cardOrders = register.orders.filter(order => order.paymentType === 'card');
 
     const cashRecvd = cashOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     const expectedCash = cashOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
 
     const onlineRecvd = onlineOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     const expectedOnline = onlineOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+    const cardRecvd = cardOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+    const expectedCard = cardOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
 
     const totalSales = register.orders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
     const totalExpenses = register.expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
@@ -143,8 +146,10 @@ router.post('/close', async (req, res) => {
     register.totalExpenses = totalExpenses;
     register.expectedCash = expectedCash;
     register.expectedOnline = expectedOnline;
+    register.expectedCard = expectedCard;
     register.cashRecvd = cashRecvd;
     register.onlineRecvd = onlineRecvd;
+    register.cardRecvd = cardRecvd;
 
     const closedRegister = await register.save();
 
@@ -204,16 +209,44 @@ router.post('/close', async (req, res) => {
         const totalDiscount = register.totalDiscount || 0;
         const finalAmountSold = absoluteTotal - totalDiscount;
 
+        // ---- Tax totals ----
+        const taxCollectedCash = cashOrders.reduce((sum, o) => sum + (o.tax || 0), 0);
+        const taxCollectedCard = cardOrders.reduce((sum, o) => sum + (o.tax || 0), 0);
+        const totalTaxCollected = taxCollectedCash + taxCollectedCard;
+
+        // ---- Order counts ----
+        const totalOrders = register.orders.length;
+        const cashOrderCount = cashOrders.length;
+        const onlineOrderCount = onlineOrders.length;
+        const cardOrderCount = cardOrders.length;
+
         summary = {
           itemSummary: itemSummaryArray,
-          categorySummary: categorySummaryArray, // 👈 Added category summary
+          categorySummary: categorySummaryArray,
           absoluteTotal,
           totalDiscount,
           finalAmountSold,
           cashRecvd,
           onlineRecvd,
+          cardRecvd,
+          digitalRecvd: onlineRecvd + cardRecvd,
+          expectedCash,
+          expectedOnline,
+          expectedCard,
+          expectedDigital: expectedOnline + expectedCard,
+          taxCollectedCash,
+          taxCollectedCard,
+          totalTaxCollected,
+          totalOrders,
+          cashOrderCount,
+          onlineOrderCount,
+          cardOrderCount,
           totalExpenses,
           closingBalance: finalCash,
+          startCash: register.startCash,
+          openedAt: register.openedAt,
+          closedAt: new Date(),
+          manager: register.manager,
         };
 
         // ---- Send daily summary email ----
@@ -266,12 +299,15 @@ router.get('/live-summary', async (req, res) => {
     // ---- Compute aggregates (same as close but without mutating register) ----
     const cashOrders = (register.orders || []).filter(order => order.paymentType === 'cash');
     const onlineOrders = (register.orders || []).filter(order => order.paymentType === 'online');
+    const cardOrders = (register.orders || []).filter(order => order.paymentType === 'card');
 
     const cashRecvd = cashOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     const expectedCash = cashOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
 
     const onlineRecvd = onlineOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
     const expectedOnline = onlineOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
+    const cardRecvd = cardOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+    const expectedCard = cardOrders.reduce((sum, order) => sum + (order.finalPrice || 0), 0);
 
     const totalSales = (register.orders || []).reduce((sum, order) => sum + (order.finalPrice || 0), 0);
     const totalExpenses = (register.expenses || []).reduce((sum, expense) => sum + (expense.amount || 0), 0);
@@ -329,6 +365,12 @@ router.get('/live-summary', async (req, res) => {
       finalAmountSold,
       cashRecvd,
       onlineRecvd,
+      cardRecvd,
+      digitalRecvd: onlineRecvd + cardRecvd,
+      expectedCash,
+      expectedOnline,
+      expectedCard,
+      expectedDigital: expectedOnline + expectedCard,
       totalExpenses,
       // include a few register meta fields for client convenience
       sessionId: register.sessionId,

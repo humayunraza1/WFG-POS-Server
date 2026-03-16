@@ -479,8 +479,10 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
       totalSales: 0,
       cashRecvd: 0,
       onlineRecvd: 0,
+      cardRecvd: 0,
       expectedCash: 0,
       expectedOnline: 0,
+      expectedCard: 0,
       totalExpenses: 0,
       startCash: 0,
       openingBalance: 0,
@@ -498,8 +500,10 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
       combined.totalSales += reg.totalSales || 0;
       combined.cashRecvd += reg.cashRecvd || 0;
       combined.onlineRecvd += reg.onlineRecvd || 0;
+      combined.cardRecvd += reg.cardRecvd || 0;
       combined.expectedCash += reg.expectedCash || 0;
       combined.expectedOnline += reg.expectedOnline || 0;
+      combined.expectedCard += reg.expectedCard || 0;
       combined.totalExpenses += reg.totalExpenses || 0;
       combined.startCash += reg.startCash || 0;
       combined.openingBalance += reg.openingBalance || 0;
@@ -516,6 +520,9 @@ router.get('/registers/summary', hasAccess("isManager"), async (req, res) => {
         expectedBalance: reg.expectedBalance || 0
       });
     });
+
+    combined.digitalRecvd = combined.onlineRecvd + combined.cardRecvd;
+    combined.expectedDigital = combined.expectedOnline + combined.expectedCard;
 
     res.json(combined);
   } catch (error) {

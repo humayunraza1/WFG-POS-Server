@@ -60,9 +60,18 @@ const orderSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  tax: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  taxRate: {
+    type: Number,
+    default: 0,
+  },
   paymentType: {
     type: String,
-    enum: ['cash', 'online'],
+    enum: ['cash', 'online', 'card'],
     required: true
   },
   actualPrice: {
