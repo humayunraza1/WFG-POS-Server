@@ -39,6 +39,14 @@ const orderSchema = new mongoose.Schema({
       type: String,
       required: true
     },
+    dealName: {
+      type: String,
+      default: ''
+    },
+    dealSelectionLabel: {
+      type: String,
+      default: ''
+    },
     unitPrice: {
       type: Number,
       required: true,
