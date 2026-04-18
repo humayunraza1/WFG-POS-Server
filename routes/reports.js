@@ -108,6 +108,7 @@ router.get('/create-report',hasAccess("canGenReport"), async (req, res) => {
 
     // Get session IDs for aggregation queries
     const sessionIds = sessions.map(session => session.sessionId);
+  const digitalPaymentTypes = ['online', 'card'];
 
     // Aggregate all orders within the date range
     const orderStats = await Order.aggregate([
@@ -133,7 +134,7 @@ router.get('/create-report',hasAccess("canGenReport"), async (req, res) => {
           totalOnlinePayments: {
             $sum: {
               $cond: [
-                { $eq: ['$paymentType', 'online'] },
+                { $in: ['$paymentType', digitalPaymentTypes] },
                 '$amountPaid',
                 0
               ]
@@ -151,7 +152,7 @@ router.get('/create-report',hasAccess("canGenReport"), async (req, res) => {
           expectedOnline: {
             $sum: {
               $cond: [
-                { $eq: ['$paymentType', 'online'] },
+                { $in: ['$paymentType', digitalPaymentTypes] },
                 '$finalPrice',
                 0
               ]
@@ -193,7 +194,7 @@ router.get('/create-report',hasAccess("canGenReport"), async (req, res) => {
         .filter(order => order.paymentType === 'cash')
         .reduce((sum, order) => sum + order.amountPaid, 0);
       const managerOnlineReceived = sessionOrders
-        .filter(order => order.paymentType === 'online')
+        .filter(order => digitalPaymentTypes.includes(order.paymentType))
         .reduce((sum, order) => sum + order.amountPaid, 0);
 
       if (!salesByManager[session.manager]) {

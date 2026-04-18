@@ -4,286 +4,476 @@
   <meta charset="UTF-8">
   <title><%= business.name %> – Daily Summary</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-      background-color: #f5f6fa;
+      background-color: #f0f2f5;
       margin: 0;
       padding: 0;
       color: #333;
     }
-
-    .wrapper {
-      width: 100%;
-      padding: 30px 0;
-    }
-
+    .wrapper { width: 100%; padding: 28px 0; }
     .card {
-      max-width: 700px;
+      max-width: 680px;
       margin: 0 auto;
       background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-radius: 14px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.10);
       overflow: hidden;
     }
 
+    /* ── Header ── */
     .header {
-      background: linear-gradient(135deg, #2563eb, #1e40af);
+      background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
       color: white;
       text-align: center;
-      padding: 30px 20px;
+      padding: 32px 24px 28px;
     }
-
-    .header img {
-      max-height: 60px;
-      margin-bottom: 12px;
+    .header img { max-height: 56px; margin-bottom: 14px; display: block; margin-left: auto; margin-right: auto; }
+    .header h1 { font-size: 22px; margin: 0 0 6px; font-weight: 700; letter-spacing: 0.3px; }
+    .header .sub { font-size: 13px; opacity: 0.85; margin: 0; }
+    .header .meta {
+      display: inline-flex; gap: 20px; margin-top: 16px;
+      background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 18px;
+      font-size: 13px;
     }
+    .header .meta span { opacity: 0.95; }
+    .header .meta strong { font-weight: 600; }
 
-    .header h1 {
-      font-size: 24px;
-      margin: 0;
-      font-weight: 600;
+    /* ── Stat cards row ── */
+    .stat-row {
+      display: table; width: 100%; border-collapse: collapse;
+      background: #f8faff; border-bottom: 1px solid #e5e7eb;
     }
-
-    .header p {
-      margin: 6px 0 0;
-      font-size: 14px;
-      opacity: 0.9;
+    .stat-cell {
+      display: table-cell; width: 25%; padding: 18px 12px; text-align: center;
+      border-right: 1px solid #e5e7eb;
     }
+    .stat-cell:last-child { border-right: none; }
+    .stat-cell .stat-icon { font-size: 22px; margin-bottom: 4px; }
+    .stat-cell .stat-val { font-size: 18px; font-weight: 700; color: #111; line-height: 1.2; }
+    .stat-cell .stat-lbl { font-size: 11px; color: #6b7280; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-cell.blue  .stat-val { color: #1d4ed8; }
+    .stat-cell.green .stat-val { color: #15803d; }
+    .stat-cell.orange .stat-val { color: #c2410c; }
+    .stat-cell.red   .stat-val { color: #dc2626; }
 
-    .section {
-      padding: 25px 30px;
-      border-bottom: 1px solid #eee;
-    }
-
-    .section:last-child {
-      border-bottom: none;
-    }
-
+    /* ── Section ── */
+    .section { padding: 24px 28px; border-bottom: 1px solid #eee; }
+    .section:last-child { border-bottom: none; }
     .section h2 {
-      font-size: 18px;
-      margin-top: 0;
-      color: #111;
-      border-left: 4px solid #2563eb;
-      padding-left: 10px;
-      font-weight: 600;
+      font-size: 15px; margin: 0 0 16px; color: #111;
+      border-left: 4px solid #1d4ed8; padding-left: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.4px;
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 12px;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    th, td {
-      text-align: left;
-      padding: 10px 12px;
-      font-size: 14px;
-    }
-
-    th {
-      background: #f3f4f6;
-      color: #333;
-      font-weight: 600;
-      border-bottom: 2px solid #e5e7eb;
-    }
-
-    td {
-      border-bottom: 1px solid #f0f0f0;
-    }
-
-    td.text-right {
-      text-align: right;
-    }
-
-    .totals {
-      margin-top: 15px;
-    }
-
-    .total-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 0;
-      font-size: 15px;
-      line-height: 1.6;
-      width: 100%;
-    }
-
-    .total-item .label {
-      color: #333;
-      font-weight: 500;
-      flex: 0 1 auto;
-      text-align: left;
-    }
-
-    .total-item .value {
-      color: #111;
-      font-weight: 600;
+    /* ── Payment rows ── */
+    .money {
       text-align: right;
       white-space: nowrap;
-      flex: 0 1 auto;
-      margin-left: auto;
+      font-variant-numeric: tabular-nums;
     }
-
-    .total-item.negative .value {
-      color: #dc2626;
+    .pay-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0;
     }
-
-    .total-item.positive .value {
-      color: #16a34a;
+    .pay-table td {
+      border-bottom: 1px solid #f3f4f6;
+      padding: 9px 0;
+      vertical-align: middle;
     }
-
-    .footer {
+    .pay-table tr:last-child td { border-bottom: none; }
+    .pay-left-wrap {
+      display: block;
+    }
+    .pay-icon {
+      display: inline-block;
+      vertical-align: middle;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      border-radius: 8px;
       text-align: center;
+      line-height: 36px;
+      font-size: 18px;
+    }
+    .pay-text {
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 10px;
+      max-width: calc(100% - 52px);
+    }
+    .pay-icon.cash { background: #dcfce7; }
+    .pay-icon.wallet { background: #dbeafe; }
+    .pay-icon.card { background: #ede9fe; }
+    .pay-icon.total { background: #f3f4f6; }
+    .pay-icon.tax { background: #fef3c7; }
+    .pay-name { font-size: 14px; font-weight: 600; color: #111; line-height: 1.25; }
+    .pay-sub { font-size: 12px; color: #6b7280; margin-top: 2px; line-height: 1.2; }
+    .pay-badge {
+      display: inline-block;
+      background: #e5e7eb;
+      color: #374151;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 20px;
+      padding: 1px 8px;
+      margin-top: 4px;
+    }
+    .pay-amount { font-size: 15px; font-weight: 700; color: #111; }
+    .pay-sub-row td {
+      padding-top: 4px;
+      padding-bottom: 4px;
+      border-bottom: none;
       font-size: 12px;
-      color: #777;
-      padding: 20px;
-      background: #f9fafb;
+      color: #6b7280;
     }
+    .pay-sub-label { padding-left: 46px; }
+    .pay-sub-tax .pay-sub-label,
+    .pay-sub-tax .money {
+      color: #d97706;
+      font-weight: 600;
+    }
+    .pay-divider td { border-top: 2px solid #e5e7eb; }
+    .pay-highlight .pay-name,
+    .pay-highlight .pay-amount { color: #1d4ed8; }
+    .pay-highlight .pay-amount { font-size: 16px; }
+    .pay-total-tax td {
+      background: #fffbeb;
+      border-bottom: none;
+      padding: 10px 8px;
+    }
+    .pay-total-tax .pay-name { color: #92400e; }
+    .pay-total-tax .pay-amount { color: #b45309; }
+    .tax-note { margin-top: 10px; padding: 8px 12px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 12px; color: #92400e; }
 
-    .footer a {
-      color: #2563eb;
-      text-decoration: none;
+    /* ── Sales summary ── */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0;
     }
+    .summary-table td {
+      border-bottom: 1px solid #f3f4f6;
+      padding: 9px 0;
+      font-size: 14px;
+      vertical-align: middle;
+    }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .sum-label { color: #555; }
+    .sum-val {
+      text-align: right;
+      font-weight: 600;
+      color: #111;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .summary-row-neg .sum-val { color: #dc2626; }
+    .summary-row-pos .sum-val { color: #15803d; }
+    .summary-row-tax .sum-label,
+    .summary-row-tax .sum-val { color: #b45309; }
+    .summary-row-highlight td {
+      background: #eff6ff;
+      padding: 10px 12px;
+      border-bottom: none;
+    }
+    .summary-row-highlight .sum-label { color: #1d4ed8; font-weight: 600; }
+    .summary-row-highlight .sum-val { color: #1d4ed8; font-size: 16px; }
 
-    .footer a:hover {
-      text-decoration: underline;
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 13px; }
+    th {
+      background: #f3f4f6; color: #374151; font-weight: 600;
+      text-align: left; padding: 9px 10px; border-bottom: 2px solid #e5e7eb;
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px;
     }
+    td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; font-size: 13px; color: #333; }
+    td.tr { text-align: right; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Footer ── */
+    .footer { text-align: center; font-size: 12px; color: #9ca3af; padding: 20px 24px; background: #f9fafb; }
+    .footer a { color: #1d4ed8; text-decoration: none; }
 
     @media (max-width: 600px) {
-      .card {
-        margin: 10px;
-      }
-      .section {
-        padding: 20px;
-      }
-      th, td {
-        font-size: 13px;
-      }
+      .card { margin: 8px; }
+      .section { padding: 18px 16px; }
+      .stat-cell { padding: 14px 8px; }
+      .stat-cell .stat-val { font-size: 15px; }
+      .header .meta { gap: 12px; padding: 8px 12px; }
     }
   </style>
 </head>
 <body>
-  <div class="wrapper">
-    <div class="card">
-      <!-- Header -->
-      <div class="header">
-        <% if (business.logo) { %>
-          <img src="cid:logo@inline" alt="<%= business.name %> Logo">
-        <% } %>
-        <h1><%= business.name %></h1>
-        <p>Daily Register Summary</p>
-      </div>
+<% 
+  var openDate = summary.openedAt ? new Date(summary.openedAt) : new Date();
+  var closeDate = summary.closedAt ? new Date(summary.closedAt) : new Date();
+  var dateStr = openDate.toLocaleDateString('en-PK', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  var openTime = openDate.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit' });
+  var closeTime = closeDate.toLocaleTimeString('en-PK', { hour:'2-digit', minute:'2-digit' });
+  var cashTotal = summary.cashRecvd || 0;
+  var cashTax = summary.taxCollectedCash || 0;
+  var cashSubTotal = Math.max(0, cashTotal - cashTax);
+  var onlineTotal = summary.onlineRecvd || 0;
+  var cardTotal = summary.cardRecvd || 0;
+  var cardTax = summary.taxCollectedCard || 0;
+  var cardSubTotal = Math.max(0, cardTotal - cardTax);
+  var digitalTotal = onlineTotal + cardTotal;
+  var totalTaxCollected = summary.totalTaxCollected || (cashTax + cardTax);
+%>
+<div class="wrapper">
+  <div class="card">
 
-      <!-- Intro -->
-      <div class="section">
-        <p>Hi <strong><%= business.name %></strong>,</p>
-        <p>Here's your daily sales summary for the register session.</p>
-      </div>
-
-      <!-- Category Summary -->
-      <div class="section">
-        <h2>Category Summary</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Quantity</th>
-              <th class="text-right">Revenue (PKR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% summary.categorySummary.forEach(function(cat) { %>
-              <tr>
-                <td><%= cat.category %></td>
-                <td><%= cat.totalCount %></td>
-                <td class="text-right"><%= cat.totalRevenue.toLocaleString() %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Item Summary -->
-      <div class="section">
-        <h2>Items Sold</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Quantity</th>
-              <th class="text-right">Revenue (PKR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% summary.itemSummary.forEach(function(item) { %>
-              <tr>
-                <td><%= item.name %></td>
-                <td><%= item.totalCount %></td>
-                <td class="text-right"><%= item.totalRevenue.toLocaleString() %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Totals -->
-      <div class="section">
-        <h2>Sales Summary</h2>
-        <div class="totals">
-          <div class="total-item">
-            <span class="label">Absolute Total</span>
-            <span class="value">Rs <%= summary.absoluteTotal.toLocaleString() %></span>
-          </div>
-          <div class="total-item negative">
-            <span class="label">Discount Given</span>
-            <span class="value">- Rs <%= summary.totalDiscount.toLocaleString() %></span>
-          </div>
-          <div class="total-item positive">
-            <span class="label">Final Amount Sold</span>
-            <span class="value">Rs <%= summary.finalAmountSold.toLocaleString() %></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Payment Breakdown -->
-      <div class="section">
-        <h2>Payment Breakdown</h2>
-        <div class="totals">
-          <div class="total-item">
-            <span class="label">Cash Received</span>
-            <span class="value">Rs <%= summary.cashRecvd.toLocaleString() %></span>
-          </div>
-          <div class="total-item">
-            <span class="label">Online Received</span>
-            <span class="value">Rs <%= summary.onlineRecvd.toLocaleString() %></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Expenses -->
-      <div class="section">
-        <h2>Expenses & Balance</h2>
-        <div class="totals">
-          <div class="total-item negative">
-            <span class="label">Total Expenses</span>
-            <span class="value">- Rs <%= summary.totalExpenses.toLocaleString() %></span>
-          </div>
-          <div class="total-item positive">
-            <span class="label">Closing Balance</span>
-            <span class="value">Rs <%= summary.closingBalance.toLocaleString() %></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Footer -->
-      <div class="footer">
-        &copy; <%= new Date().getFullYear() %> <%= footer.company %>. All rights reserved.<br>
-        Need help? <a href="mailto:<%= footer.email %>"><%= footer.email %></a>
+    <!-- ── Header ── -->
+    <div class="header">
+      <% if (business.logo) { %>
+        <img src="cid:logo@inline" alt="<%= business.name %> Logo">
+      <% } %>
+      <h1><%= business.name %></h1>
+      <p class="sub">Daily Register Summary</p>
+      <div class="meta">
+        <span>📅 <strong><%= dateStr %></strong></span>
+        <span>🕐 <%= openTime %> – <%= closeTime %></span>
+        <% if (summary.manager) { %><span>👤 <strong><%= summary.manager %></strong></span><% } %>
       </div>
     </div>
+
+    <!-- ── At-a-glance stat cards ── -->
+    <div class="stat-row">
+      <div class="stat-cell blue">
+        <div class="stat-icon">🧾</div>
+        <div class="stat-val"><%= summary.totalOrders || 0 %></div>
+        <div class="stat-lbl">Orders</div>
+      </div>
+      <div class="stat-cell green">
+        <div class="stat-icon">💰</div>
+        <div class="stat-val">Rs <%= (summary.finalAmountSold || 0).toLocaleString() %></div>
+        <div class="stat-lbl">Net Sales</div>
+      </div>
+      <div class="stat-cell orange">
+        <div class="stat-icon">🏛️</div>
+        <div class="stat-val">Rs <%= (summary.totalTaxCollected || 0).toLocaleString() %></div>
+        <div class="stat-lbl">Tax Collected</div>
+      </div>
+      <div class="stat-cell red">
+        <div class="stat-icon">📤</div>
+        <div class="stat-val">Rs <%= (summary.totalExpenses || 0).toLocaleString() %></div>
+        <div class="stat-lbl">Expenses</div>
+      </div>
+    </div>
+
+    <!-- ── Payment Breakdown ── -->
+    <div class="section">
+      <h2>Payment Breakdown</h2>
+
+      <table class="pay-table" role="presentation" cellpadding="0" cellspacing="0">
+        <!-- Cash -->
+        <tr>
+          <td>
+            <div class="pay-left-wrap">
+              <span class="pay-icon cash">💵</span>
+              <div class="pay-text">
+                <div class="pay-name">Cash</div>
+                <% if ((summary.cashOrderCount || 0) > 0) { %>
+                  <span class="pay-badge"><%= summary.cashOrderCount %> order<%= summary.cashOrderCount === 1 ? '' : 's' %></span>
+                <% } %>
+              </div>
+            </div>
+          </td>
+          <td class="money"><span class="pay-amount">Rs <%= cashTotal.toLocaleString() %></span></td>
+        </tr>
+        <tr class="pay-sub-row">
+          <td class="pay-sub-label">Subtotal (before tax)</td>
+          <td class="money">Rs <%= cashSubTotal.toLocaleString() %></td>
+        </tr>
+        <tr class="pay-sub-row pay-sub-tax">
+          <td class="pay-sub-label">Tax (15% GST)</td>
+          <td class="money">Rs <%= cashTax.toLocaleString() %></td>
+        </tr>
+
+        <!-- Mobile Wallets -->
+        <tr>
+          <td>
+            <div class="pay-left-wrap">
+              <span class="pay-icon wallet">📱</span>
+              <div class="pay-text">
+                <div class="pay-name">Mobile Wallets</div>
+                <div class="pay-sub">Easypaisa · JazzCash · Nayapay</div>
+                <% if ((summary.onlineOrderCount || 0) > 0) { %>
+                  <span class="pay-badge"><%= summary.onlineOrderCount %> order<%= summary.onlineOrderCount === 1 ? '' : 's' %></span>
+                <% } %>
+              </div>
+            </div>
+          </td>
+          <td class="money"><span class="pay-amount">Rs <%= onlineTotal.toLocaleString() %></span></td>
+        </tr>
+        <tr class="pay-sub-row">
+          <td class="pay-sub-label">Tax</td>
+          <td class="money">Rs 0</td>
+        </tr>
+
+        <!-- Card -->
+        <tr>
+          <td>
+            <div class="pay-left-wrap">
+              <span class="pay-icon card">💳</span>
+              <div class="pay-text">
+                <div class="pay-name">Debit / Credit Cards</div>
+                <% if ((summary.cardOrderCount || 0) > 0) { %>
+                  <span class="pay-badge"><%= summary.cardOrderCount %> order<%= summary.cardOrderCount === 1 ? '' : 's' %></span>
+                <% } %>
+              </div>
+            </div>
+          </td>
+          <td class="money"><span class="pay-amount">Rs <%= cardTotal.toLocaleString() %></span></td>
+        </tr>
+        <tr class="pay-sub-row">
+          <td class="pay-sub-label">Subtotal (before tax)</td>
+          <td class="money">Rs <%= cardSubTotal.toLocaleString() %></td>
+        </tr>
+        <tr class="pay-sub-row pay-sub-tax">
+          <td class="pay-sub-label">Tax (8%)</td>
+          <td class="money">Rs <%= cardTax.toLocaleString() %></td>
+        </tr>
+
+        <!-- Total Digital -->
+        <tr class="pay-divider pay-highlight">
+          <td>
+            <div class="pay-left-wrap">
+              <span class="pay-icon total">🔢</span>
+              <div class="pay-text">
+                <div class="pay-name">Total Digital</div>
+                <div class="pay-sub">Wallets + Cards</div>
+              </div>
+            </div>
+          </td>
+          <td class="money"><span class="pay-amount">Rs <%= digitalTotal.toLocaleString() %></span></td>
+        </tr>
+
+        <!-- Total Tax Collected -->
+        <% if (totalTaxCollected > 0) { %>
+        <tr class="pay-total-tax">
+          <td>
+            <div class="pay-left-wrap">
+              <span class="pay-icon tax">🏛️</span>
+              <div class="pay-text">
+                <div class="pay-name">Total Tax Collected</div>
+                <div class="pay-sub">Cash GST + Card Tax</div>
+              </div>
+            </div>
+          </td>
+          <td class="money"><span class="pay-amount">Rs <%= totalTaxCollected.toLocaleString() %></span></td>
+        </tr>
+        <% } %>
+      </table>
+
+      <div class="tax-note">
+        📌 Tax rates applied — <strong>Cash: 15% GST</strong> · <strong>Card: 8%</strong> · <strong>Mobile Wallets: no tax</strong>
+      </div>
+    </div>
+
+    <!-- ── Sales Summary ── -->
+    <div class="section">
+      <h2>Sales Summary</h2>
+      <table class="summary-table" role="presentation" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="sum-label">Gross Sales (before discount)</td>
+          <td class="sum-val">Rs <%= (summary.absoluteTotal || 0).toLocaleString() %></td>
+        </tr>
+        <% if ((summary.totalDiscount || 0) > 0) { %>
+        <tr class="summary-row-neg">
+          <td class="sum-label">Discount Given</td>
+          <td class="sum-val">− Rs <%= summary.totalDiscount.toLocaleString() %></td>
+        </tr>
+        <% } %>
+        <tr class="summary-row-pos">
+          <td class="sum-label">Net Sales</td>
+          <td class="sum-val">Rs <%= (summary.finalAmountSold || 0).toLocaleString() %></td>
+        </tr>
+        <% if ((summary.totalTaxCollected || 0) > 0) { %>
+        <tr class="summary-row-tax">
+          <td class="sum-label">Tax Collected (included in sales)</td>
+          <td class="sum-val">Rs <%= summary.totalTaxCollected.toLocaleString() %></td>
+        </tr>
+        <% } %>
+        <tr class="summary-row-neg">
+          <td class="sum-label">Total Expenses</td>
+          <td class="sum-val">− Rs <%= (summary.totalExpenses || 0).toLocaleString() %></td>
+        </tr>
+        <tr>
+          <td class="sum-label">Opening Cash</td>
+          <td class="sum-val">Rs <%= (summary.startCash || 0).toLocaleString() %></td>
+        </tr>
+        <tr class="summary-row-highlight">
+          <td class="sum-label">💼 Closing Balance (Actual)</td>
+          <td class="sum-val">Rs <%= (summary.closingBalance || 0).toLocaleString() %></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- ── Category Summary ── -->
+    <% if (summary.categorySummary && summary.categorySummary.length > 0) { %>
+    <div class="section">
+      <h2>Category Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th style="text-align:center;">Qty</th>
+            <th style="text-align:right;">Revenue (PKR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% summary.categorySummary.forEach(function(cat) { %>
+            <tr>
+              <td><%= cat.category %></td>
+              <td style="text-align:center;"><%= cat.totalCount %></td>
+              <td class="tr">Rs <%= cat.totalRevenue.toLocaleString() %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+
+    <!-- ── Items Sold ── -->
+    <% if (summary.itemSummary && summary.itemSummary.length > 0) { %>
+    <div class="section">
+      <h2>Items Sold</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:center;">Qty</th>
+            <th style="text-align:right;">Revenue (PKR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% summary.itemSummary.forEach(function(item) { %>
+            <tr>
+              <td>
+                <%= item.name %>
+                <% if (item.category && item.category !== 'Uncategorized') { %>
+                  <br><span style="font-size:11px;color:#9ca3af;"><%= item.category %></span>
+                <% } %>
+              </td>
+              <td style="text-align:center;"><%= item.totalCount %></td>
+              <td class="tr">Rs <%= item.totalRevenue.toLocaleString() %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+
+    <!-- ── Footer ── -->
+    <div class="footer">
+      &copy; <%= new Date().getFullYear() %> <%= footer.company %>. All rights reserved.<br>
+      Questions? <a href="mailto:<%= footer.email %>"><%= footer.email %></a>
+    </div>
+
   </div>
+</div>
 </body>
 </html>

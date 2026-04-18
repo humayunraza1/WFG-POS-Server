@@ -55,6 +55,10 @@ const registerSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  deletedCard:{
+    type: Number,
+    default: 0
+  },
   deletedSales:{
     type: Number,
     default: 0
@@ -77,11 +81,31 @@ const registerSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  cardRecvd:{
+    type: Number,
+    default: 0
+  },
     expectedCash:{
     type: Number,
     default: 0
   },
   expectedOnline:{
+    type: Number,
+    default: 0
+  },
+  expectedCard:{
+    type: Number,
+    default: 0
+  },
+  taxCollectedCash: {
+    type: Number,
+    default: 0
+  },
+  taxCollectedCard: {
+    type: Number,
+    default: 0
+  },
+  totalTaxCollected: {
     type: Number,
     default: 0
   },
