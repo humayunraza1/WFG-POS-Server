@@ -9,8 +9,39 @@ const hasAccess = require('../middleware/hasAccess');
 const updateRegister = require('../utils/updateRegister');
 const Account = require('../models/Account');
 const DeletedOrder = require('../models/DeletedOrder');
+const Category = require('../models/Category');
 
 router.use(authenticate);
+
+async function snapshotCategoryDetails(items, session) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return [];
+  }
+
+  const categoryIds = [...new Set(items.map((item) => item.category).filter(Boolean).map(String))];
+  if (categoryIds.length === 0) {
+    return items;
+  }
+
+  const categories = await Category.find({ _id: { $in: categoryIds } })
+    .select('name isPartnership partnershipBusinessName partnershipSharePercent')
+    .session(session);
+
+  const categoryMap = new Map(categories.map((category) => [String(category._id), category]));
+
+  return items.map((item) => {
+    const category = categoryMap.get(String(item.category));
+    const sharePercent = Number(category?.partnershipSharePercent || 0);
+
+    return {
+      ...item,
+      categoryName: category?.name || item.categoryName || '',
+      isPartnershipCategory: Boolean(category?.isPartnership),
+      partnershipBusinessName: category?.partnershipBusinessName || item.partnershipBusinessName || '',
+      partnershipSharePercent: Number.isFinite(sharePercent) ? sharePercent : 0,
+    };
+  });
+}
 
 // Get all orders
 router.get('/', hasAccess('isManager'), async (req, res) => {
@@ -25,7 +56,7 @@ router.get('/', hasAccess('isManager'), async (req, res) => {
       orders = await Order.find()
         .sort({ createdAt: -1 })
         .populate({ path: 'items.product', select: 'name' })
-        .populate({ path: 'items.category', select: 'name' });
+        .populate({ path: 'items.category', select: 'name isPartnership partnershipSharePercent' });
     } else {
       // Get all registers managed by the current user
       const employee = await Account.findById(userId).populate('employeeRef');
@@ -38,7 +69,7 @@ router.get('/', hasAccess('isManager'), async (req, res) => {
       orders = await Order.find({ registerSession: { $in: sessionIds } })
         .sort({ createdAt: -1 })
         .populate({ path: 'items.product', select: 'name' })
-        .populate({ path: 'items.category', select: 'name' });
+        .populate({ path: 'items.category', select: 'name isPartnership partnershipSharePercent' });
     }
 
     // Attach register session manager info
@@ -75,7 +106,7 @@ router.get('/session/:sessionId', async (req, res) => {
     const orders = await Order.find({ registerSession: sessionId })
       .sort({ createdAt: -1 }) // Most recent first
       .populate({path:'items.product',select:'name'})
-      .populate({path:'items.category',select:'name'});
+      .populate({path:'items.category',select:'name isPartnership partnershipSharePercent'});
     res.json(orders);
   } catch (error) {
     console.error(error);
@@ -114,9 +145,11 @@ router.post('/', async (req, res) => {
 
   try {
     const acc = await Account.findById(cashierId).session(session);
+    const snapshottedItems = await snapshotCategoryDetails(orderData.items, session);
 
     const finalOrderData = {
       ...orderData,
+      items: snapshottedItems,
       cashier: cashierId,
       branchCode: acc.branchCode
     };
@@ -142,7 +175,7 @@ router.post('/', async (req, res) => {
 
     // Populate after committing (not needed in transaction)
     await newOrder.populate({ path: 'items.product', select: 'name' });
-    await newOrder.populate({ path: 'items.category', select: 'name' });
+  await newOrder.populate({ path: 'items.category', select: 'name isPartnership partnershipSharePercent' });
 
     res.status(201).json(newOrder);
   } catch (error) {

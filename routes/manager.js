@@ -635,7 +635,7 @@ router.get('/register/sessions', hasAccess("isManager"), async (req, res) => {
 
     const account = await Account.findById(userId).populate('employeeRef');
 
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, manager } = req.query;
     let filter = {};
 
     // Date filter
@@ -651,6 +651,10 @@ router.get('/register/sessions', hasAccess("isManager"), async (req, res) => {
       }
     }
 
+    if (manager && manager !== 'ALL') {
+      filter.manager = manager;
+    }
+
     // Restrict by manager access if not admin
     if (!account.access.isAdmin && !account.access.canViewAllRegisters) {
       filter.managerRef = userId;
@@ -661,14 +665,14 @@ router.get('/register/sessions', hasAccess("isManager"), async (req, res) => {
         path: 'orders',
         populate: {
           path: 'items.product items.category',
-          select: 'name price'
+          select: 'name price isPartnership partnershipBusinessName partnershipSharePercent'
         }
       })
       .populate({
         path: 'deletedOrders',
         populate: {
           path: 'items.product items.category',
-          select: 'name price'
+          select: 'name price isPartnership partnershipBusinessName partnershipSharePercent'
         }
       })
       .populate('expenses')
@@ -694,7 +698,7 @@ router.get('/register/sessions/:id',hasAccess("isManager"), async (req, res) => 
         path: 'orders',
         populate: {
           path: 'items.product items.category',
-          select: 'name price'
+          select: 'name price isPartnership partnershipBusinessName partnershipSharePercent'
         }
       })
       .populate('expenses');

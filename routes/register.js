@@ -11,6 +11,10 @@ const { sendDailySummaryEmail } = require('../services/emailService');
 
 router.use(authenticate);
 
+function getItemCategoryName(item) {
+  return item.categoryName || item.category?.name || 'Uncategorized';
+}
+
 // Get register status and session data
 router.get('/status', async (req, res) => {
   try {
@@ -100,14 +104,16 @@ router.post('/close', async (req, res) => {
     const register = await Register.findOne({ isOpen: true, cashier: cashierId })
       .populate({
         path: 'orders',
-        populate: {
-          path: 'items.product',
-          populate: {
-            path: 'category',
+        populate: [
+          {
+            path: 'items.product',
             select: 'name'
           },
-          select: 'name category'
-        }
+          {
+            path: 'items.category',
+            select: 'name isPartnership partnershipBusinessName partnershipSharePercent'
+          }
+        ]
       })
       .populate('expenses');
 
@@ -171,7 +177,7 @@ router.post('/close', async (req, res) => {
             const productName = item.product?.name || 'Unknown Product';
             const optionName = item.optionName ? ` - ${item.optionName}` : '';
             const name = `${productName}${optionName}`;
-            const categoryName = item.product?.category?.name || 'Uncategorized';
+            const categoryName = getItemCategoryName(item);
 
             // ---- Per-item aggregation (also track category) ----
             if (!itemSummaryMap[name]) {
@@ -281,14 +287,16 @@ router.get('/live-summary', async (req, res) => {
     const register = await Register.findOne(query)
       .populate({
         path: 'orders',
-        populate: {
-          path: 'items.product',
-          populate: {
-            path: 'category',
+        populate: [
+          {
+            path: 'items.product',
             select: 'name'
           },
-          select: 'name category'
-        }
+          {
+            path: 'items.category',
+            select: 'name isPartnership partnershipBusinessName partnershipSharePercent'
+          }
+        ]
       })
       .populate('expenses');
 
@@ -322,7 +330,7 @@ router.get('/live-summary', async (req, res) => {
         const productName = item.product?.name || 'Unknown Product';
         const optionName = item.optionName ? ` - ${item.optionName}` : '';
         const name = `${productName}${optionName}`;
-        const categoryName = item.product?.category?.name || 'Uncategorized';
+        const categoryName = getItemCategoryName(item);
 
         if (!itemSummaryMap[name]) {
           itemSummaryMap[name] = { totalCount: 0, totalRevenue: 0, category: categoryName };

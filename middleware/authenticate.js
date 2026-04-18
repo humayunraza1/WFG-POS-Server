@@ -24,6 +24,7 @@ const authenticate = async (req, res, next) => {
     req.user = {
       userId: account._id,
       username: account.username,
+      branchCode: account.branchCode || null,
       access: expandAccess(account.access),
     };
 

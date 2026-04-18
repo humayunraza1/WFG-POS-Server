@@ -33,6 +33,24 @@ const deletedOrderSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId
     },
     optionName: String,
+    categoryName: {
+      type: String,
+      default: ''
+    },
+    isPartnershipCategory: {
+      type: Boolean,
+      default: false
+    },
+    partnershipBusinessName: {
+      type: String,
+      default: ''
+    },
+    partnershipSharePercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
     unitPrice: Number,
     quantity: Number,
     totalPrice: Number

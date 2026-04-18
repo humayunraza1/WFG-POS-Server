@@ -39,6 +39,24 @@ const orderSchema = new mongoose.Schema({
       type: String,
       required: true
     },
+    categoryName: {
+      type: String,
+      default: ''
+    },
+    isPartnershipCategory: {
+      type: Boolean,
+      default: false
+    },
+    partnershipBusinessName: {
+      type: String,
+      default: ''
+    },
+    partnershipSharePercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
     dealName: {
       type: String,
       default: ''

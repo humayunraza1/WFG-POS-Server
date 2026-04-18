@@ -260,7 +260,20 @@ router.get('/', async (req, res) => {
 // ✅ Get all products with category populated
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await Category.find().sort({ name: 1 });
+    const isPrivilegedUser = Boolean(req.user?.access?.isAdmin || req.user?.access?.isManager);
+    const branchCode = String(req.user?.branchCode || '').trim();
+
+    const categoryQuery = isPrivilegedUser || !branchCode
+      ? {}
+      : {
+          $or: [
+            { assignedBranches: { $exists: false } },
+            { assignedBranches: { $size: 0 } },
+            { assignedBranches: branchCode },
+          ],
+        };
+
+    const categories = await Category.find(categoryQuery).sort({ name: 1 });
     res.json(categories);
    } catch (error) {
     res.status(500).json({ message: error.message });
@@ -467,11 +480,27 @@ router.delete('/deals/:id', hasAccess('isManager'), async (req, res) => {
 // Create a new category with counter-based customId
 router.post('/add-category', hasAccess("isManager"), async (req, res) => {
   try {
-    const { name, imageUrl } = req.body;
+    const {
+      name,
+      imageUrl,
+      assignedBranches = [],
+      isPartnership = false,
+      partnershipBusinessName = '',
+      partnershipSharePercent = 0,
+    } = req.body;
 
     if (!name || !imageUrl) {
       return res.status(400).json({ message: "Both name and imageUrl are required." });
     }
+
+    const normalizedSharePercent = Number(isPartnership ? partnershipSharePercent : 0);
+    if (Number.isNaN(normalizedSharePercent) || normalizedSharePercent < 0 || normalizedSharePercent > 100) {
+      return res.status(400).json({ message: 'Partnership share percent must be between 0 and 100.' });
+    }
+
+    const normalizedAssignedBranches = Array.isArray(assignedBranches)
+      ? [...new Set(assignedBranches.map((branchCode) => String(branchCode || '').trim()).filter(Boolean))]
+      : [];
 
     // Check for duplicate category name
     const existing = await Category.findOne({ name });
@@ -487,7 +516,11 @@ router.post('/add-category', hasAccess("isManager"), async (req, res) => {
     const newCategory = new Category({
       customId:newProductId,
       name,
-      imageUrl
+      imageUrl,
+      assignedBranches: normalizedAssignedBranches,
+      isPartnership: Boolean(isPartnership),
+      partnershipBusinessName: Boolean(isPartnership) ? String(partnershipBusinessName || '').trim() : '',
+      partnershipSharePercent: Boolean(isPartnership) ? normalizedSharePercent : 0,
     });
 
     const savedCategory = await newCategory.save();
