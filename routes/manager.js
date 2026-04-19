@@ -665,14 +665,14 @@ router.get('/register/sessions', hasAccess("isManager"), async (req, res) => {
         path: 'orders',
         populate: {
           path: 'items.product items.category',
-          select: 'name price isPartnership partnershipBusinessName partnershipSharePercent'
+          select: 'name options isPartnership partnershipBusinessName partnershipSharePercent'
         }
       })
       .populate({
         path: 'deletedOrders',
         populate: {
           path: 'items.product items.category',
-          select: 'name price isPartnership partnershipBusinessName partnershipSharePercent'
+          select: 'name options isPartnership partnershipBusinessName partnershipSharePercent'
         }
       })
       .populate('expenses')
@@ -698,7 +698,7 @@ router.get('/register/sessions/:id',hasAccess("isManager"), async (req, res) => 
         path: 'orders',
         populate: {
           path: 'items.product items.category',
-          select: 'name price isPartnership partnershipBusinessName partnershipSharePercent'
+          select: 'name options isPartnership partnershipBusinessName partnershipSharePercent'
         }
       })
       .populate('expenses');

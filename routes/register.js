@@ -107,7 +107,7 @@ router.post('/close', async (req, res) => {
         populate: [
           {
             path: 'items.product',
-            select: 'name'
+            select: 'name options'
           },
           {
             path: 'items.category',
@@ -290,7 +290,7 @@ router.get('/live-summary', async (req, res) => {
         populate: [
           {
             path: 'items.product',
-            select: 'name'
+            select: 'name options'
           },
           {
             path: 'items.category',
