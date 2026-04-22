@@ -86,6 +86,16 @@ const orderSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  discountType: {
+    type: String,
+    enum: ['amount', 'percentage'],
+    default: 'amount'
+  },
+  discountValue: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   tax: {
     type: Number,
     default: 0,
